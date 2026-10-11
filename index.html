@@ -3,78 +3,74 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AGEROUS</title>
+  <title>AGEROUS — describe what happens, watch the world live through it</title>
+  <meta name="description" content="A 3D browser game where you describe events in plain language and a small living town reacts to them for real." />
   <link rel="stylesheet" href="/src/style.css" />
 </head>
 <body>
-  <div id="app">
-    <!-- 3D Canvas -->
-    <canvas id="world-canvas"></canvas>
+  <canvas id="world-canvas"></canvas>
 
-    <!-- HUD Top Bar -->
-    <div id="hud-top">
-      <div id="brand">AGEROUS</div>
-      <div id="clock-display">
-        <span id="day-label">DAY 1</span>
-        <span id="time-label">08:00</span>
-      </div>
-      <div id="weather-display">
-        <span id="weather-icon">☀</span>
-        <span id="weather-label">Clear</span>
-      </div>
+  <header id="hud-top">
+    <div id="brand">AGEROUS</div>
+    <div id="clock"><b id="clock-time">08:00</b><span id="clock-day">Day 1 · Monday</span></div>
+    <div id="weather"><span id="weather-icon">☀</span><span id="weather-label">Clear</span></div>
+    <div id="alert" class="hidden"></div>
+    <div id="score" title="Community wellbeing: safety, food and social need of every resident"><b id="score-val">–</b><span>WELLBEING</span></div>
+    <div id="speed">
+      <button data-speed="0" title="Pause">⏸</button>
+      <button data-speed="10" class="on" title="Normal">1×</button>
+      <button data-speed="30" title="Fast">3×</button>
+      <button data-speed="90" title="Very fast">9×</button>
     </div>
-
-    <!-- Event Input Panel -->
-    <div id="event-panel">
-      <div id="event-panel-title">What should happen in the world?</div>
-      <div id="scenario-chips" aria-label="Quick scenarios">
-        <button class="scenario-chip" data-event="A severe flood is coming">Flood</button>
-        <button class="scenario-chip" data-event="The local election is tomorrow">Election</button>
-        <button class="scenario-chip" data-event="School is closed tomorrow">School closure</button>
-        <button class="scenario-chip" data-event="A large food shipment arrived">Market shipment</button>
-        <button class="scenario-chip" data-event="Sunday service this morning">Church service</button>
-      </div>
-      <textarea id="event-input" placeholder="e.g. A severe flood is coming..." rows="2"></textarea>
-      <div id="event-actions">
-        <button id="simulate-btn">SIMULATE</button>
-        <span id="sim-status"></span>
-      </div>
+    <div id="tools">
+      <button id="btn-view" title="Toggle walk / sky view (Tab)">Sky view</button>
+      <button id="btn-ai" title="AI interpreter settings">AI</button>
+      <button id="btn-new" title="Start a new world">New world</button>
     </div>
+  </header>
 
-    <!-- Status Panel -->
-    <div id="status-panel" aria-live="polite"></div>
+  <aside id="left">
+    <section class="panel" id="status-panel"><h3>Town</h3><div id="status-rows"></div></section>
+    <section class="panel" id="challenge-panel"><h3>Challenges</h3><div id="challenges"></div></section>
+  </aside>
 
-    <!-- History Panel -->
-    <div id="history-panel">
-      <div id="history-title">WORLD HISTORY</div>
-      <div id="history-list"></div>
+  <aside id="right">
+    <section class="panel" id="history-panel"><h3>World history <small id="saved-note"></small></h3><div id="history"></div></section>
+    <canvas id="minimap" width="176" height="176" aria-label="Map"></canvas>
+  </aside>
+
+  <div id="npc-card" class="panel hidden"></div>
+  <div id="talk-hint" class="hidden"></div>
+
+  <section id="prompt">
+    <div id="interp" class="hidden"></div>
+    <div id="chips">
+      <button data-p="A severe flood is coming">🌊 Severe flood</button>
+      <button data-p="The local election is tomorrow">🗳 Election tomorrow</button>
+      <button data-p="School is closed tomorrow">🏫 School closed tomorrow</button>
+      <button data-p="A large food shipment arrived at the market">🛒 Shipment</button>
+      <button data-p="Sunday service this morning">⛪ Service</button>
+      <button data-p="It is sunny now">☀ Clear skies</button>
     </div>
+    <form id="prompt-form" autocomplete="off">
+      <span id="prompt-label">What should happen?</span>
+      <input id="prompt-input" type="text" maxlength="400" placeholder="Describe an event…  e.g. “A severe flood is coming and the election is tomorrow”" />
+      <button id="prompt-go" type="submit">SIMULATE</button>
+    </form>
+    <div id="controls">Enter: type an event · WASD move · Shift run · drag to look · E talk · Tab sky view</div>
+  </section>
 
-    <!-- Active Events Ticker -->
-    <div id="active-events-bar">
-      <span id="active-events-label">ACTIVE: </span>
-      <span id="active-events-text">Normal day</span>
-    </div>
-
-    <!-- NPC Info Tooltip -->
-    <div id="npc-tooltip" class="hidden">
-      <div id="npc-tooltip-name"></div>
-      <div id="npc-tooltip-info"></div>
-    </div>
-
-    <!-- API Key modal (shown if no key in localStorage) -->
-    <div id="api-modal" class="hidden">
-      <div id="api-modal-box">
-        <div id="api-modal-title">AGEROUS Setup</div>
-        <p>Enter your OpenAI API key to enable event interpretation.<br/>
-        The key is stored only in your browser's localStorage.</p>
-        <input type="password" id="api-key-input" placeholder="sk-..." />
-        <button id="api-key-save">Save &amp; Start</button>
-        <p style="font-size:11px;opacity:0.5;margin-top:8px;">
-          Without a key, events will use a built-in rule-based fallback.
-        </p>
-        <button id="api-key-skip">Continue without API key</button>
-      </div>
+  <div id="modal" class="hidden">
+    <div id="modal-box">
+      <h2>AI interpreter</h2>
+      <p>Agerous understands plain language <b>offline</b> with built-in rules. Add your own key and an LLM interprets your prompts instead — but it can only emit events from a fixed schema, which are validated before the simulation runs them.</p>
+      <label>Provider
+        <select id="ai-provider"><option value="">Offline rules (no key)</option><option value="openai">OpenAI</option><option value="anthropic">Anthropic</option></select>
+      </label>
+      <label>API key <input id="ai-key" type="password" placeholder="sk-…" autocomplete="off" /></label>
+      <label>Model <input id="ai-model" type="text" placeholder="default" /></label>
+      <p class="fine">The key is stored only in this browser's localStorage and sent only to the provider you pick. For a public deployment put a small proxy in front instead (see README).</p>
+      <div class="row"><button id="ai-save">Save</button><button id="ai-close" class="ghost">Close</button></div>
     </div>
   </div>
 

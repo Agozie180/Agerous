@@ -1,220 +1,112 @@
 /**
- * AGEROUS — Main Entry Point
+ * AGEROUS — entry point
  *
- * Wires together:
- *   worldState ← simulationEngine ← eventInterpreter ← UI
- *   worldState → worldRenderer → canvas
- *   worldState → uiController → DOM
+ *   prompt → interpret (LLM or offline) → validate (schema) → queueEvent → world
+ *   world → step() every frame → GameScene + UI read it
  */
+import { createWorld } from './simulation/world.js';
+import { step, startWorld } from './simulation/engine.js';
+import { queueEvent } from './simulation/events.js';
+import { interpret, PROVIDERS } from './simulation/interpreter.js';
+import { loadWorld, saveWorld, clearSave } from './simulation/persistence.js';
+import { log, day, hour } from './simulation/world.js';
+import { GameScene } from './renderer/scene.js';
+import { Player } from './renderer/player.js';
+import { UI } from './ui/ui.js';
 
-import { createWorldState, addHistory, resetWorldState } from './simulation/worldState.js';
-import { createNPCs, tickAllNPCs } from './simulation/npcSystem.js';
-import { tickTime, executeEvent } from './simulation/simulationEngine.js';
-import { interpretEvent, validateEvent } from './simulation/eventInterpreter.js';
-import { WorldRenderer } from './renderer/worldRenderer.js';
-import { UIController } from './ui/uiController.js';
+const $ = id => document.getElementById(id);
+const AI_KEY = 'agerous.ai';
+const readAI = () => { try { return JSON.parse(localStorage.getItem(AI_KEY)) || {}; } catch { return {}; } };
 
-// ─── Bootstrap ───────────────────────────────────────────────────
+let world = loadWorld();
+const resumed = !!world;
+if (!world) world = startWorld(createWorld(Date.now() % 100000));
 
-async function main() {
-  // 1. World state
-  let state = _createFreshState();
+const gs = new GameScene($('world-canvas'));
+const player = new Player(gs);
+const ui = new UI();
+let busy = false;
 
-  // 2. Renderer
-  const canvas   = document.getElementById('world-canvas');
-  const renderer = new WorldRenderer(canvas);
-  renderer.init();
-  renderer.spawnNPCs(state.npcs);
-
-  // 3. UI
-  const ui = new UIController();
-  ui.update(state);
-  ui.setupSpeedControl(state);
-
-  // 4. API key handling
-  let apiKey = localStorage.getItem('agerous_openai_key') || null;
-  _setupAPIModal(key => { apiKey = key; });
-
-  // 5. Event input wiring
-  _setupEventInput(state, ui, () => apiKey);
-  _setupScenarioChips(state, ui, () => apiKey);
-
-  // 6. Reset button
-  _setupReset(
-    () => {
-      // Returns a new state; renderer re-uses its existing scene but
-      // NPC meshes are already spawned — we just update NPC data
-      state = _createFreshState();
-      renderer.syncNPCs(state.npcs);
-      ui.resetHistory();
-      ui.update(state);
-      ui.setupSpeedControl(state);
-      _setupEventInput(state, ui, () => apiKey);
-    }
-  );
-
-  // 7. Mouse tooltip
-  window.addEventListener('mousemove', e => {
-    renderer.checkNPCHover(state.npcs, e);
-    renderer.positionTooltip(e.clientX, e.clientY);
-  });
-
-  // 8. Main loop — uses a closure over `state` reference so reset works
-  let lastTime = performance.now();
-  function loop(now) {
-    const deltaMs = now - lastTime;
-    lastTime = now;
-
-    tickTime(state, deltaMs);
-    renderer.render(state);
-    ui.update(state);
-
-    requestAnimationFrame(loop);
-  }
-  requestAnimationFrame(loop);
+// ── the core loop: describe → interpret → validate → simulate ────────────
+export async function runPrompt(text) {
+  if (busy || !text.trim()) return null;
+  busy = true; $('prompt-go').disabled = true;
+  try {
+    const ai = readAI();
+    const result = await interpret(text, { provider: ai.provider, apiKey: ai.key, model: ai.model, context: { day: day(world), hour: hour(world) } });
+    const outcomes = result.events.map(e => queueEvent(world, e));
+    log(world, `You: “${text.trim()}”${result.events.length ? '' : ' (nothing happened)'}`, 'you');
+    world.prompts.push({ t: world.t, text: text.trim(), source: result.source, events: result.events, rejected: result.rejected.length });
+    world.prompts = world.prompts.slice(-30);
+    ui.showInterpretation(result, outcomes);
+    saveWorld(world);
+    return { result, outcomes };
+  } finally { busy = false; $('prompt-go').disabled = false; }
 }
 
-// ─── Helper: build a fresh simulation state ──────────────────────
+// ── prompt UI ────────────────────────────────────────────────────────────
+const input = $('prompt-input');
+input.addEventListener('focus', () => { player.typing = true; });
+input.addEventListener('blur', () => { player.typing = false; });
+input.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Escape') input.blur(); });
+$('prompt-form').addEventListener('submit', async e => { e.preventDefault(); const t = input.value; input.value = ''; await runPrompt(t); });
+document.querySelectorAll('#chips button').forEach(b => b.addEventListener('click', () => { input.value = b.dataset.p; input.focus(); }));
 
-function _createFreshState() {
-  const state  = createWorldState();
-  state.npcs   = createNPCs();
-
-  addHistory(state, '--- Day 1 ---', 'normal');
-  addHistory(state, 'Agerous community has woken up.', 'normal');
-  addHistory(state, 'School open · Market open · Church quiet.', 'normal');
-
-  tickAllNPCs(state);
-  return state;
-}
-
-// ─── API Modal ───────────────────────────────────────────────────
-
-function _setupAPIModal(onKey) {
-  const modal   = document.getElementById('api-modal');
-  const input   = document.getElementById('api-key-input');
-  const saveBtn = document.getElementById('api-key-save');
-  const skipBtn = document.getElementById('api-key-skip');
-
-  const stored = localStorage.getItem('agerous_openai_key');
-  if (stored) {
-    onKey(stored);
-    return; // already have key, no modal needed
-  }
-
-  modal.classList.remove('hidden');
-
-  saveBtn.addEventListener('click', () => {
-    const key = input.value.trim();
-    if (key.startsWith('sk-')) {
-      localStorage.setItem('agerous_openai_key', key);
-      onKey(key);
-    }
-    modal.classList.add('hidden');
-  });
-
-  skipBtn.addEventListener('click', () => {
-    modal.classList.add('hidden');
-    onKey(null);
-  });
-
-  input.addEventListener('keydown', e => {
-    if (e.key === 'Enter') saveBtn.click();
-  });
-}
-
-// ─── Event Input ─────────────────────────────────────────────────
-
-// Keep a reference to old listeners so they can be removed on reset
-let _currentHandleSubmit = null;
-let _currentKeydownHandler = null;
-
-function _setupEventInput(state, ui, getApiKey) {
-  const btn   = document.getElementById('simulate-btn');
-  const input = document.getElementById('event-input');
-
-  if (_currentHandleSubmit) {
-    btn.removeEventListener('click', _currentHandleSubmit);
-  }
-  if (_currentKeydownHandler) {
-    input.removeEventListener('keydown', _currentKeydownHandler);
-  }
-
-  async function handleSubmit() {
-    const text = ui.getInputText();
-    if (!text) return;
-
-    ui.setSimulating(true, 'Interpreting…');
-
-    let event;
-    try {
-      event = await interpretEvent(text, getApiKey());
-    } catch (err) {
-      ui.setSimulating(false);
-      ui.showStatus(`Error: ${err.message}`, '#f87171');
-      return;
-    }
-
-    const validation = validateEvent(event);
-    if (!validation.valid) {
-      ui.setSimulating(false);
-      ui.showStatus(validation.reason, '#f87171');
-      return;
-    }
-
-    ui.showStatus(`→ ${event.event_type.replace(/_/g, ' ')}`, '#6ee7b7');
-
-    setTimeout(() => {
-      executeEvent(state, event);
-      ui.setSimulating(false);
-      ui.showStatus('Event simulated ✓', '#6ee7b7');
-      ui.clearInput();
-      setTimeout(() => ui.showStatus(''), 4000);
-    }, 400);
-  }
-
-  function handleKeydown(e) {
-    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleSubmit();
-  }
-
-  btn.addEventListener('click', handleSubmit);
-  input.addEventListener('keydown', handleKeydown);
-
-  _currentHandleSubmit = handleSubmit;
-  _currentKeydownHandler = handleKeydown;
-}
-
-function _setupScenarioChips(state, ui, getApiKey) {
-  const chips = document.querySelectorAll('.scenario-chip');
-  for (const chip of chips) {
-    chip.addEventListener('click', () => {
-      const text = chip.dataset.event || '';
-      const input = document.getElementById('event-input');
-      if (!input) return;
-      input.value = text;
-      input.focus();
-      input.dispatchEvent(new Event('input'));
-      if (text.trim()) {
-        ui.showStatus('Scenario loaded', '#7dd3fc');
-      }
-    });
-  }
-}
-
-// ─── Reset Button ─────────────────────────────────────────────────
-
-function _setupReset(onReset) {
-  const btn = document.getElementById('reset-btn');
-  if (!btn) return;
-  btn.addEventListener('click', () => {
-    if (confirm('Reset the world? All history will be lost.')) {
-      onReset();
-    }
-  });
-}
-
-// ─── Start ───────────────────────────────────────────────────────
-
-main().catch(err => {
-  console.error('[Agerous] Fatal error:', err);
+window.addEventListener('keydown', e => {
+  if (player.typing) return;
+  if (e.key === 'Enter') { e.preventDefault(); input.focus(); }
+  else if (e.key === 'Tab') { e.preventDefault(); toggleView(); }
+  else if (e.code === 'KeyE') { const n = player.nearestNPC(world); if (n) ui.npcCard(n, world); }
+  else if (e.code === 'Space') { e.preventDefault(); setSpeed(world.timeSpeed === 0 ? 10 : 0); }
 });
+function toggleView() { $('btn-view').textContent = player.toggleMode() === 'walk' ? 'Sky view' : 'Walk view'; }
+$('btn-view').onclick = toggleView;
+function setSpeed(v) { world.timeSpeed = v; document.querySelectorAll('#speed button').forEach(b => b.classList.toggle('on', Number(b.dataset.speed) === v)); }
+document.querySelectorAll('#speed button').forEach(b => b.addEventListener('click', () => setSpeed(Number(b.dataset.speed))));
+setSpeed(world.timeSpeed);
+
+// ── AI settings ─────────────────────────────────────────────────────────
+$('btn-ai').onclick = () => {
+  const s = readAI();
+  $('ai-provider').value = s.provider || ''; $('ai-key').value = s.key || ''; $('ai-model').value = s.model || '';
+  $('modal').classList.remove('hidden');
+};
+$('ai-close').onclick = () => $('modal').classList.add('hidden');
+$('ai-save').onclick = () => {
+  const provider = $('ai-provider').value, key = $('ai-key').value.trim(), model = $('ai-model').value.trim();
+  try { if (!provider || !key) localStorage.removeItem(AI_KEY); else localStorage.setItem(AI_KEY, JSON.stringify({ provider, key, model: model || PROVIDERS[provider].defaultModel })); } catch { /* storage blocked */ }
+  $('modal').classList.add('hidden');
+};
+
+// ── new world ───────────────────────────────────────────────────────────
+$('btn-new').onclick = () => {
+  if (!confirm('Start a new world? The current town and its history will be erased.')) return;
+  clearSave(); world = startWorld(createWorld(Date.now() % 100000)); ui.histLen = 0; ui.clearSelection(); setSpeed(10); saveWorld(world);
+};
+
+// ── picking NPCs by click ───────────────────────────────────────────────
+$('world-canvas').addEventListener('pointerup', e => {
+  if (!player.consumeClick()) return;
+  const id = gs.pickPerson({ x: (e.clientX / innerWidth) * 2 - 1, y: -(e.clientY / innerHeight) * 2 + 1 });
+  if (id) ui.npcCard(world.npcs[id], world); else ui.clearSelection();
+});
+
+// ── frame loop ──────────────────────────────────────────────────────────
+let last = performance.now(), lastSave = last;
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 0.25); last = now;
+  step(world, dt);
+  player.update(world, dt);
+  gs.update(world, { selectedId: ui.selected, focus: player.focus });
+  gs.render();
+  ui.update(world, dt, player);
+  ui.talkHint(player.mode === 'walk' && !player.typing ? player.nearestNPC(world) : null);
+  if (now - lastSave > 5000) { lastSave = now; if (saveWorld(world)) $('saved-note').textContent = 'saved'; }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+window.addEventListener('beforeunload', () => saveWorld(world));
+if (resumed) log(world, 'Welcome back — the world remembered where you left off.', 'good');
+
+// handle for tests and curious judges: window.agerous.world / .say("…")
+window.agerous = { get world() { return world; }, say: runPrompt, player, scene: gs };

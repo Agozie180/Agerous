@@ -1,12 +1,14 @@
 {
   "name": "agerous",
   "version": "1.0.0",
-  "description": "Agerous — AI-native 3D world simulation",
+  "description": "Agerous \u2014 describe what happens in plain language and watch a small 3D town live through it",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node --test test/*.test.mjs",
+    "e2e": "python3 e2e/run.py http://localhost:4173/"
   },
   "dependencies": {
     "three": "^0.165.0"
