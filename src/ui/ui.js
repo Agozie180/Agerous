@@ -111,17 +111,30 @@ export class UI {
 
   // ── NPC inspector ───────────────────────────────────────────────────
   npcCard(n, w) {
-    this.selected = n.id;
-    const bar = (l, v) => `<div class="bar ${v < 0.4 ? 'low' : ''}"><span>${l}</span><i><u style="width:${Math.round(v * 100)}%"></u></i>${Math.round(v * 100)}%</div>`;
     const card = $('npc-card');
-    card.classList.remove('hidden');
-    card.innerHTML = `<button class="x" id="npc-x">×</button>
-      <h4>${esc(n.name)}</h4><div class="sub">${esc(n.occupation)} · ${n.age} · lives at ${esc(LOCATION_SPECS[n.home].name)}</div>
+    const bar = (l, v) => `<div class="bar ${v < 0.4 ? 'low' : ''}"><span>${l}</span><i><u style="width:${Math.round(v * 100)}%"></u></i>${Math.round(v * 100)}%</div>`;
+    const info = `<h4>${esc(n.name)}</h4><div class="sub">${esc(n.occupation)} · ${n.age} · lives at ${esc(LOCATION_SPECS[n.home].name)}</div>
       <span class="act">${ACT[n.activity] ?? n.activity}</span>
       <div class="why">${esc(n.reason)}</div>
       ${bar('Safety', n.needs.safety)}${bar('Food', n.needs.food)}${bar('Social', n.needs.social)}
       <div class="sub" style="margin-top:8px">Money ${n.money} · Routine: ${esc(n.routine)}${n.voter ? ` · ${n.voted ? 'has voted' : 'eligible voter'}` : ''}</div>`;
-    $('npc-x').onclick = () => this.clearSelection();
+    if (this.selected !== n.id || card.classList.contains('hidden')) {
+      this.selected = n.id;
+      card.classList.remove('hidden');
+      // the talk form lives outside the live-updating info block so typing is never wiped
+      card.innerHTML = `<button class="x" id="npc-x">×</button><div id="npc-info"></div>
+        <form id="npc-talk"><input id="npc-q" maxlength="120" placeholder="Ask ${esc(n.name.split(' ')[0])} something…" autocomplete="off"/><button>Ask</button></form><div id="npc-reply"></div>`;
+      $('npc-x').onclick = () => this.clearSelection();
+      const q = $('npc-q'); q.addEventListener('keydown', e => e.stopPropagation());
+      q.addEventListener('focus', () => this.onTyping?.(true)); q.addEventListener('blur', () => this.onTyping?.(false));
+      $('npc-talk').onsubmit = async e => {
+        e.preventDefault(); const text = q.value; q.value = ''; if (!text.trim()) return;
+        $('npc-reply').innerHTML = `<i>…</i>`;
+        const r = await this.onAsk?.(n.id, text);
+        if (r && this.selected === n.id) $('npc-reply').innerHTML = `<b>${esc(n.name.split(' ')[0])}:</b> “${esc(r.reply)}” <small>${r.source === 'ai' ? 'AI-voiced' : 'rule-voiced'}</small>`;
+      };
+    }
+    $('npc-info').innerHTML = info;
   }
   clearSelection() { this.selected = null; $('npc-card').classList.add('hidden'); }
 

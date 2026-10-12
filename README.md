@@ -20,7 +20,9 @@
 - **The town lives without you.** 30 simulated days with no input: teachers teach, vendors sell, farmers harvest, people eat and get paid, Sunday service fills the pews. Take away the teacher and lessons really cancel.
 - **Causality you can see.** A chip strip shows what is running; a chain of consequences (*You → flood → Main Road impassable → shelter opened*) appears after every sentence; click anyone to read **why** they are doing what they do.
 - **It remembers.** Reload the page and the water level, votes, positions and history return.
-- **Honest.** 46 unit tests, browser end-to-end flows, and an [audit](AUDIT.md) of what was fake before and what is verified now.
+- **Say it, and it exists.** *"Build a levee around the market"* raises a real wall in 3D **and** changes the flood physics: the same flood that swamps the market now leaves it dry. Sandbags, levee and flood wall have different heights, and a high flood overtops sandbags.
+- **Talk to residents.** Click anyone and ask them something. With an LLM they answer in character, grounded only in facts from the world (needs, activity, river level, town news); without one, rules write the reply. Conversation never changes the world.
+- **Honest.** 55 unit tests, browser end-to-end flows, and an [audit](AUDIT.md) of what was fake before and what is verified now.
 
 Type **"A severe flood is coming."** and the river rises over real terrain. Low ground floods first: the fields, the riverside houses, then the market. Roads go under, the supply truck turns back, and the school closes. Civil defence opens the driest reachable building as a shelter, and the residents walk there along the roads that are still open. Once the water falls, they clean up, reopen and go home. All of it is written to a history that survives a page reload.
 
@@ -89,7 +91,7 @@ The **Challenges** panel scores you from world state: bring the town through a f
 - **People walk** along the road graph at a fixed pace. A flooded road can really cut someone off. Every decision carries a human-readable `reason`.
 - **Market economy:** stock, price, sales and customers all come from who can actually arrive. A truck restocks it at 06:00 only if the road is open.
 - **Election:** campaigners persuade the people they meet in the square. Floods and high prices nudge voters. Votes are counted on arrival at the polling station. If the polling station is flooded, the election is postponed.
-- **Determinism:** one seeded RNG lives inside the world, so the same seed and prompts give the same history. That is what makes the 46 tests meaningful.
+- **Determinism:** one seeded RNG lives inside the world, so the same seed and prompts give the same history. That is what makes the 55 tests meaningful.
 - **Memory:** the whole world autosaves to `localStorage`. Reload and the clock, flood, votes, positions and history come back.
 
 ## The AI interpreter
@@ -98,10 +100,14 @@ It works **out of the box offline**. To use an LLM, click **AI**, pick a provide
 
 > The key lives in your browser's localStorage and goes straight to the provider, which is fine for a demo. For a public deployment run `node server/proxy.mjs` (zero dependencies, key stays in `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` on the server) and pick **Server proxy** in the AI dialog.
 
+## Deploy (Vercel)
+
+The repo deploys as-is: Vite static build plus two serverless functions (`api/interpret.js`, `api/npc.js`). Set **one** of `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` in the Vercel project's environment variables (optional: `OPENAI_MODEL` / `ANTHROPIC_MODEL`, `LLM_RATE_PER_MIN`, `ALLOW_ORIGIN`). The deployed site then uses real LLM interpretation and resident voices for every visitor with no key in the browser. With no key configured the game quietly falls back to the offline rules. Locally, `node server/proxy.mjs` serves the same two routes.
+
 ## Development
 
 ```bash
-npm test          # 46 tests: physics, institutions, autonomy, concurrency fuzz, election, interpreter, proxy, schema, persistence
+npm test          # 55 tests: physics, institutions, autonomy, concurrency fuzz, election, interpreter, proxy, schema, persistence
 npm run build     # production bundle in dist/
 npm run e2e       # Playwright flows A–D against `vite preview` (needs Chromium)
 ```

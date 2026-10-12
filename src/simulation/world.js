@@ -126,6 +126,7 @@ export function createWorld(seed = 1337) {
     },
     elections: [],            // archive of concluded elections
     npcs: {},
+    defenses: {},            // location id -> metres of flood protection built there
     households: {},          // home id -> { pantry } — meals in the cupboard
     scheduled: [],            // [{ t, event }]
     history: [],

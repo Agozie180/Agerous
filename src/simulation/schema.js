@@ -13,6 +13,7 @@ const intOf = (min, max, dflt) => ({ kind: 'int', min, max, dflt });
 const boolOf = dflt => ({ kind: 'bool', dflt });
 const strOf = (max, dflt = '') => ({ kind: 'str', max, dflt });
 
+export const BUILD_TARGETS = ['school', 'market', 'church', 'polling_station', 'town_square', 'fields', 'house_1', 'house_2', 'house_3', 'house_4', 'house_5', 'homes'];
 const DELAY = { delay_days: intOf(0, 7, 0) };
 
 export const EVENT_SCHEMA = {
@@ -39,6 +40,10 @@ export const EVENT_SCHEMA = {
   election: {
     describe: 'A local election between two candidates. days_until 0 = today.',
     params: { days_until: intOf(0, 7, 2) },
+  },
+  build: {
+    describe: 'Build a flood defence around a place. It raises how deep the river must get before that place floods (sandbags +0.5 m, levee +1.0 m, flood_wall +1.6 m). target "homes" = every house.',
+    params: { structure: enumOf(['sandbags', 'levee', 'flood_wall'], 'sandbags'), target: enumOf(BUILD_TARGETS, 'homes'), ...DELAY },
   },
   recovery: { describe: 'Clean-up crews clear blockages and speed up repairs.', params: { ...DELAY } },
 };

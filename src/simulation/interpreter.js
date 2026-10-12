@@ -67,6 +67,20 @@ function parseSeverity(c) {
   return 'medium';
 }
 
+const BUILD_VERB = /\b(build|builds|built|put|place|lay|put up|raise|raised|erect|construct\w*|fortif\w*|protect\w*|defend\w*|defen[cs]e|set up|stack\w*|pile)\b/;
+const BUILD_THING = /\b(sandbags?|sand bags?|levee|levees|dyke|dike|embankment|flood ?walls?|walls?|barriers?|barricades?|defen[cs]es?)\b|\bprotect\w*\b|\bfortif\w*\b/;
+const BUILD_TARGET = [
+  [/\b(polling|poll(?:s)? station|voting)\b/, 'polling_station'], [/\bschool\b/, 'school'], [/\bmarket\b/, 'market'], [/\bchurch\b/, 'church'],
+  [/\bsquare\b/, 'town_square'], [/\b(fields?|farm\w*)\b/, 'fields'],
+  [/\bhouse (?:1|one)\b/, 'house_1'], [/\bhouse (?:2|two)\b/, 'house_2'], [/\bhouse (?:3|three)\b/, 'house_3'], [/\bhouse (?:4|four)\b/, 'house_4'], [/\bhouse (?:5|five)\b/, 'house_5'],
+];
+function parseBuild(c) {
+  if (!(BUILD_VERB.test(c) && BUILD_THING.test(c))) return null;
+  const structure = /\bsand ?bags?\b/.test(c) ? 'sandbags' : /\b(levee|levees|dyke|dike|embankment)\b/.test(c) ? 'levee' : 'flood_wall';
+  const hit = BUILD_TARGET.find(([rx]) => rx.test(c));
+  return { event_type: 'build', structure, target: hit ? hit[1] : 'homes' };
+}
+
 const RX = {
   election: /\b(elections?|vot(?:e|es|ing)|ballots?|polls?|candidates?|campaign\w*|mayor)\b/,
   school: /\b(schools?|class(?:es)?|lessons?|students?|pupils?|teachers?)\b/,
@@ -93,6 +107,9 @@ function parseClause(raw) {
   c = c.replace(/\b(?:due to|because of|owing to|after|following|thanks to)\s+(?:the\s+|a\s+)?((?:\w+\s+)?(?:flood\w*|storm\w*|rain\w*))/g, (_, w) => { cause = w.trim(); return ' '; });
   const delay = parseDelay(c);
   const withDelay = e => (delay > 0 && e.event_type !== 'election' ? { ...e, delay_days: delay } : e);
+
+  const built = parseBuild(c);
+  if (built) return withDelay(built);
 
   if (RX.election.test(c)) {
     const d = /\b(today|tonight|now)\b/.test(c) ? 0 : (parseDelay(c) || 2);
@@ -124,7 +141,7 @@ function parseClause(raw) {
 }
 
 export const UNSUPPORTED_HELP =
-  'Try describing a flood, rain or storm, a school closure or exam, a market shipment or disruption, a church service, or a local election.';
+  'Try describing a flood, rain or storm, a school closure or exam, a market shipment or disruption, a church service, a local election, or building a flood defence ("build a levee around the market").';
 
 export function interpretOffline(text) {
   // Split on sentence ends, commas and "and/then" — but keep all clauses that parse.
@@ -165,6 +182,8 @@ Examples:
 "A severe flood is coming" → {"events":[{"event_type":"flood","severity":"high","duration_days":2}]}
 "School is closed tomorrow" → {"events":[{"event_type":"school_closure","duration_days":1,"reason":"closed by order","delay_days":1}]}
 "The local election is tomorrow" → {"events":[{"event_type":"election","days_until":1}]}
+"Build a levee around the market" → {"events":[{"event_type":"build","structure":"levee","target":"market"}]}
+"Put sandbags round every house" → {"events":[{"event_type":"build","structure":"sandbags","target":"homes"}]}
 "Make it snow dragons" → {"events":[{"event_type":"unsupported","reason":"Dragons and snow are not part of this world."}]}`;
 }
 

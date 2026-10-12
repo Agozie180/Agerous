@@ -53,15 +53,26 @@ with sync_playwright() as p:
     pg.evaluate("localStorage.clear()"); pg.once("dialog", lambda d: d.accept()); pg.click('#btn-new'); pg.wait_for_timeout(500)
     pg.fill('#prompt-input', 'The local election is tomorrow'); pg.click('#prompt-go'); pg.wait_for_timeout(600)
     check('B1 election called', state(pg, "agerous.world.institutions.election.state") == 'campaign')
-    pg.evaluate("agerous.world.timeSpeed = 90"); pg.wait_for_timeout(7000)
+    pg.evaluate("agerous.world.timeSpeed = 360"); pg.wait_for_timeout(7000)
     pg.screenshot(path=f'{shots}/06_campaign_sky.png') if False else None
-    for _ in range(40):
+    for _ in range(70):
         if state(pg, "agerous.world.institutions.election.state") == 'done': break
         pg.wait_for_timeout(1000)
     pg.wait_for_timeout(800)
     r = state(pg, "agerous.world.elections.at(-1)")
     check('B2 election concluded with tally & turnout', bool(r) and r['total'] > 5, json.dumps(r))
     check('B3 result in history', 'wins the local election' in pg.inner_text('#history'))
+    # ---- Flow E: build a structure from a sentence; Flow F: talk to a resident
+    pg.evaluate("agerous.world.timeSpeed = 0")
+    pg.fill('#prompt-input', 'build a levee around the church'); pg.click('#prompt-go'); pg.wait_for_timeout(800)
+    check('E1 build event interpreted', 'build' in pg.inner_text('#interp').lower(), pg.inner_text('#interp')[:80].replace('\n',' | '))
+    check('E2 defence stored in world state', state(pg, "agerous.world.defenses.church") == 1.0)
+    pg.wait_for_timeout(2200)
+    check('E3 3D structure exists in the scene', state(pg, "Object.keys(agerous.scene.defenseMeshes||{}).includes('church')"))
+    pg.screenshot(path=f'{shots}/07_build.png')
+    pg.evaluate("agerous.ui.npcCard(Object.values(agerous.world.npcs)[0], agerous.world)"); pg.wait_for_timeout(300)
+    pg.fill('#npc-q', 'are you safe?'); pg.press('#npc-q', 'Enter'); pg.wait_for_timeout(800)
+    check('F1 resident replies in character', len(pg.inner_text('#npc-reply')) > 10, pg.inner_text('#npc-reply')[:80])
     pg.evaluate("agerous.world.timeSpeed = 0")
     check('no console errors', not errors, '; '.join(errors[:3]))
     b.close()

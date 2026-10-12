@@ -12,37 +12,22 @@
  * In the game: AI settings → Provider "Proxy" → URL http://localhost:8787/interpret
  */
 import http from 'node:http';
-import { buildSystemPrompt } from '../src/simulation/interpreter.js';
+import { handleInterpret, handleNpc, rateLimited } from './handlers.mjs';
 
 export function createProxy({ fetch: fetchImpl = globalThis.fetch, env = process.env } = {}) {
+  const ROUTES = { '/interpret': handleInterpret, '/npc': handleNpc };
   return http.createServer(async (req, res) => {
     const cors = { 'Access-Control-Allow-Origin': env.ALLOW_ORIGIN || '*', 'Access-Control-Allow-Headers': 'content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
     if (req.method === 'OPTIONS') { res.writeHead(204, cors); return res.end(); }
-    if (req.method !== 'POST' || req.url !== '/interpret') { res.writeHead(404, cors); return res.end('not found'); }
+    const handler = ROUTES[req.url];
+    if (req.method !== 'POST' || !handler) { res.writeHead(404, cors); return res.end('not found'); }
+    if (rateLimited(req.socket.remoteAddress || '?', env)) { res.writeHead(429, cors); return res.end('{"error":"slow down"}'); }
     let body = '';
     for await (const c of req) { body += c; if (body.length > 4000) { res.writeHead(413, cors); return res.end(); } }
     try {
-      const { text, context } = JSON.parse(body);
-      const system = buildSystemPrompt(context || {});
-      let rawText, model;
-      if (env.ANTHROPIC_API_KEY) {
-        model = env.ANTHROPIC_MODEL || 'claude-haiku-5-5';
-        const r = await fetchImpl('https://api.anthropic.com/v1/messages', { method: 'POST',
-          headers: { 'content-type': 'application/json', 'x-api-key': env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
-          body: JSON.stringify({ model, max_tokens: 400, temperature: 0, system, messages: [{ role: 'user', content: String(text).slice(0, 400) }] }) });
-        if (!r.ok) throw new Error(`upstream ${r.status}`);
-        rawText = (await r.json()).content?.map(b => b.text ?? '').join('');
-      } else if (env.OPENAI_API_KEY) {
-        model = env.OPENAI_MODEL || 'gpt-4o-mini';
-        const r = await fetchImpl('https://api.openai.com/v1/chat/completions', { method: 'POST',
-          headers: { 'content-type': 'application/json', authorization: `Bearer ${env.OPENAI_API_KEY}` },
-          body: JSON.stringify({ model, temperature: 0, max_tokens: 400, response_format: { type: 'json_object' },
-            messages: [{ role: 'system', content: system }, { role: 'user', content: String(text).slice(0, 400) }] }) });
-        if (!r.ok) throw new Error(`upstream ${r.status}`);
-        rawText = (await r.json()).choices?.[0]?.message?.content;
-      } else throw new Error('no provider key configured on the server');
-      res.writeHead(200, { ...cors, 'content-type': 'application/json' });
-      res.end(JSON.stringify({ rawText, model }));
+      const r = await handler(JSON.parse(body), env, fetchImpl);
+      res.writeHead(r.status, { ...cors, 'content-type': 'application/json' });
+      res.end(JSON.stringify(r.json));
     } catch (e) {
       res.writeHead(502, { ...cors, 'content-type': 'application/json' });
       res.end(JSON.stringify({ error: e.message }));

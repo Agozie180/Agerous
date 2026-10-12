@@ -11,7 +11,7 @@ import {
   LOCATION_SPECS, locationElevation, isSunday, isSchoolDay, weekdayIndex,
 } from './geography.js';
 import { GRAPH, edgeBlocked, findPath } from './pathing.js';
-import { FLOOD_DEPTH, atRisk, forecastStage, isRaining } from './hazard.js';
+import { FLOOD_DEPTH, atRisk, forecastStage, isRaining, effectiveElevation } from './hazard.js';
 import { day, hour, hourF, log, dayStartT } from './world.js';
 import { decideAll } from './npcs.js';
 import { rand } from './rng.js';
@@ -39,7 +39,7 @@ export function refresh(world) {
 function updateLocations(w) {
   const stage = w.env.stage;
   for (const [id, loc] of Object.entries(w.locations)) {
-    const elev = locationElevation(id);
+    const elev = effectiveElevation(w, id);
     const spec = LOCATION_SPECS[id];
     const wet = stage > elev + FLOOD_DEPTH;
     if (wet) {

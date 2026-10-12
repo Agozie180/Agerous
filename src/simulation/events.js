@@ -20,7 +20,27 @@ function startRain(w, peak, hours) {
   w.env.rainUntil = Math.max(w.env.rainUntil ?? w.t, w.t + hours * 60);
 }
 
+export const DEFENSE_HEIGHT = { sandbags: 0.5, levee: 1.0, flood_wall: 1.6 };
+const STRUCTURE_NAME = { sandbags: 'Sandbags', levee: 'A levee', flood_wall: 'A flood wall' };
+const HOMES = ['house_1', 'house_2', 'house_3', 'house_4', 'house_5'];
+
 const HANDLERS = {
+  build(w, e) {
+    w.defenses ??= {};
+    const h = DEFENSE_HEIGHT[e.structure];
+    const targets = e.target === 'homes' ? HOMES : [e.target];
+    const built = [], skipped = [];
+    for (const id of targets) {
+      const name = w.locations[id]?.name ?? id;
+      if (w.locations[id]?.flooded) skipped.push(`${name} (already under water)`);
+      else if ((w.defenses[id] ?? 0) >= h) skipped.push(`${name} (already protected as well or better)`);
+      else { w.defenses[id] = h; built.push(name); }
+    }
+    if (built.length) log(w, `${STRUCTURE_NAME[e.structure]} goes up around ${built.join(', ')} (+${h.toFixed(1)} m of protection).`, 'major');
+    if (skipped.length) log(w, `Nothing built at ${skipped.join(', ')}.`, 'info');
+    if (!built.length) return { ok: false, message: `Could not build: ${skipped.join('; ')}.` };
+    return { ok: true };
+  },
   flood(w, e) {
     const peak = FLOOD_PEAK[e.severity];
     startRain(w, peak, e.duration_days * 12);

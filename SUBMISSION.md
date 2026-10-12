@@ -10,12 +10,14 @@
 
 **How AI is used.** The LLM is the *interpreter*: it turns a free-form sentence into structured events from a fixed schema. A validator rejects unknown types and clamps numbers, then a deterministic, seeded simulation decides the consequences (water physics, a road graph, needs-driven NPC rules, an election model). The renderer only reads state. Invalid or unsupported prompts are rejected with an explanation and leave the world byte-identical. An offline parser is the fallback when the model is unavailable.
 
-**Why it holds up.** 46 automated tests (physics, 30-day autonomy, concurrent-event fuzz, interpreter, persistence), Playwright end-to-end flows, and an honest [AUDIT.md](AUDIT.md).
+**Say it, and it exists.** Plain language also *builds*: "build a levee around the market" raises a wall in the 3D scene and changes the flood physics. Residents can be talked to, and answer in character from real world state.
+
+**Why it holds up.** 55 automated tests (physics, 30-day autonomy, concurrent-event fuzz, interpreter, persistence), Playwright end-to-end flows, and an honest [AUDIT.md](AUDIT.md).
 
 ## Deliverables checklist
 
 - [x] Public repository — https://github.com/Agozie180/Agerous
-- [ ] Hosted browser demo — deploy (GitHub Pages workflow included: Settings → Pages → Source: GitHub Actions). Build with `VITE_PROXY_URL=https://<your-proxy>/interpret` so judges get the real LLM without a key.
+- [ ] Hosted browser demo — import the repo into Vercel, add `OPENAI_API_KEY` (or `ANTHROPIC_API_KEY`) as an env var, deploy. Judges then get real LLM interpretation with no key.
 - [ ] Demo video, under 3 minutes — script below
 - [x] Written description — above
 - [x] Focus category — above
@@ -25,11 +27,11 @@
 1. **0:00** Land on the page: "Type what happens. A living 3D town reacts." Press **Watch a flood unfold**.
 2. **0:20** Show the live flood: river rising, roads going under, the chip strip (school closed, shelter open, campaign running together).
 3. **0:50** Walk view. Click a resident → "why" panel (the decision reason).
-4. **1:15** Type a new sentence yourself: "The market road is blocked and a food shipment arrived". Show the interpretation card (events + validation) and the consequence chain.
+4. **1:15** Type a new sentence yourself: "Build a levee around the market" then "A severe flood is coming" — the market stays dry. Show the interpretation card (events + validation) and the consequence chain.
 5. **1:45** Type nonsense ("summon a dragon") → rejected, world unchanged. Say why that matters.
-6. **2:05** Reload → the town remembers. Show `npm test` (46 passing).
+6. **2:05** Reload → the town remembers. Show `npm test` (55 passing).
 7. **2:25** Close: AI proposes, validator checks, simulation decides.
 
 ## Honest limits (say them, judges respect it)
 
-Residents are rule-driven agents, not LLM agents. Live LLM interpretation needs a key or the hosted proxy. Frame rate was measured on software rendering only.
+Residents' *decisions* are rule-driven (their *voices* can be LLM-generated). Live LLM interpretation needs a key or the hosted proxy. Frame rate was measured on software rendering only.

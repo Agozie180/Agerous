@@ -311,11 +311,32 @@ export class GameScene {
     this.time += dt;
     this._updateWater(world, dt);
     this._updatePlaces(world);
+    this._updateDefenses(world, dt);
     this._updatePeople(world, dt, extra.selectedId);
     this._updateSky(world);
     this._updateRain(world, dt, extra.focus);
     this.banners.visible = world.institutions.election.state === 'campaign';
     if (this.pollFlag) this.pollFlag.material.color.setHex(world.institutions.election.state === 'polling' ? 0x2ecc71 : 0x777777);
+  }
+
+  /** Structures the player has built: a wall ring that rises out of the ground, sized by state. */
+  _updateDefenses(world, dt) {
+    this.defenseMeshes ??= {};
+    for (const [id, h] of Object.entries(world.defenses || {})) {
+      let m = this.defenseMeshes[id];
+      const spec = LOCATION_SPECS[id];
+      if (!m || m.userData.h !== h) {
+        if (m) { this.scene.remove(m); m.geometry.dispose(); }
+        const color = h <= 0.5 ? 0xc9a96b : h <= 1.0 ? 0x6f8f4e : 0xb9bec7;
+        m = new THREE.Mesh(new THREE.CylinderGeometry(spec.pad + 0.5, spec.pad + 0.9, h + 0.35, 40, 1, true),
+          new THREE.MeshStandardMaterial({ color, roughness: 0.95, side: THREE.DoubleSide }));
+        m.position.set(spec.x, locationElevation(id) + (h + 0.35) / 2 - 0.15, spec.z);
+        m.castShadow = true; m.receiveShadow = true; m.userData = { h, grow: 0 };
+        m.scale.y = 0.01; this.scene.add(m); this.defenseMeshes[id] = m;
+      }
+      if (m.userData.grow < 1) { m.userData.grow = Math.min(1, m.userData.grow + dt / 1.5); m.scale.y = Math.max(0.01, m.userData.grow); m.position.y = locationElevation(id) - 0.15 + ((h + 0.35) * m.scale.y) / 2; }
+    }
+    for (const id of Object.keys(this.defenseMeshes)) if (!world.defenses?.[id]) { this.scene.remove(this.defenseMeshes[id]); delete this.defenseMeshes[id]; }
   }
 
   render() {

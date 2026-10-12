@@ -13,12 +13,14 @@ import { log, day, hour } from './simulation/world.js';
 import { GameScene } from './renderer/scene.js';
 import { Player } from './renderer/player.js';
 import { UI } from './ui/ui.js';
+import { askResident } from './simulation/talk.js';
 
 const $ = id => document.getElementById(id);
 const AI_KEY = 'agerous.ai';
 // A hosted deployment can bake in a server-side proxy (VITE_PROXY_URL) so judges get real LLM
 // interpretation with no key. A user's own saved settings always win.
-const DEFAULT_PROXY = import.meta.env?.VITE_PROXY_URL || '';
+const DEFAULT_PROXY = import.meta.env?.VITE_PROXY_URL
+  || (import.meta.env?.PROD && !/github\.io$|^localhost$|^127\./.test(location.hostname) ? '/api/interpret' : '');
 const readAI = () => {
   try { const s = JSON.parse(localStorage.getItem(AI_KEY)); if (s && s.provider) return s; } catch { /* ignore */ }
   return DEFAULT_PROXY ? { provider: 'proxy', proxy: DEFAULT_PROXY } : {};
@@ -32,6 +34,11 @@ const gs = new GameScene($('world-canvas'));
 const player = new Player(gs);
 const ui = new UI();
 let busy = false;
+ui.onTyping = v => { player.typing = v; };
+ui.onAsk = (id, text) => {
+  const ai = readAI();
+  return askResident(world.npcs[id], world, text, { provider: ai.provider, apiKey: ai.key, model: ai.model, proxyUrl: ai.provider === 'proxy' ? ai.proxy : undefined });
+};
 
 // ── the core loop: describe → interpret → validate → simulate ────────────
 export async function runPrompt(text) {
@@ -153,4 +160,4 @@ window.addEventListener('beforeunload', () => saveWorld(world));
 if (resumed) log(world, 'Welcome back — the world remembered where you left off.', 'good');
 
 // handle for tests and curious judges: window.agerous.world / .say("…")
-window.agerous = { get world() { return world; }, say: runPrompt, player, scene: gs };
+window.agerous = { get world() { return world; }, say: runPrompt, player, scene: gs, ui };

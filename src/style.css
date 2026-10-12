@@ -109,3 +109,7 @@ button.on { background: var(--accent); color: #04222a; border-color: var(--accen
 #demo-skip { position: fixed; right: 14px; bottom: 14px; z-index: 12; }
 @media (max-width: 700px) { #intro .steps { grid-template-columns: 1fr; } #now { display: none; } #chain { max-width: 94vw; top: 118px; } }
 #now { flex-wrap: nowrap; max-width: 40vw; overflow: hidden; gap: 4px; } #now span { font-size: 10px; padding: 2px 7px; }
+
+#npc-talk { display: flex; gap: 6px; margin-top: 10px; } #npc-talk input { flex: 1; min-width: 0; background: rgba(255,255,255,.07); border: 1px solid var(--line); color: inherit; border-radius: 8px; padding: 7px 9px; font-size: 12px; }
+#npc-talk button { background: var(--accent); color: #04222a; border: 0; border-radius: 8px; padding: 0 12px; font-weight: 700; cursor: pointer; }
+#npc-reply { font-size: 12.5px; line-height: 1.4; margin-top: 8px; } #npc-reply small { color: var(--dim); }
