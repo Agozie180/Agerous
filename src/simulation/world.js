@@ -106,6 +106,7 @@ export function createWorld(seed = 1337) {
       stage: 0,               // metres the river is above its normal line
       peak: 0,                // level the current rain will drive it towards
       rainUntil: null,        // absolute sim-minute the rain stops
+      defenses: {},           // location id -> metres of flood protection built there
       baseWeather: 'clear',   // weather when it is not raining
       blockedRoads: {},       // roadId -> t it is cleared (fallen trees, rubble...)
     },
@@ -126,12 +127,11 @@ export function createWorld(seed = 1337) {
     },
     elections: [],            // archive of concluded elections
     npcs: {},
-    defenses: {},            // location id -> metres of flood protection built there
     households: {},          // home id -> { pantry } — meals in the cupboard
     scheduled: [],            // [{ t, event }]
     history: [],
     prompts: [],              // what the player asked & how it was interpreted
-    stats: { episode: null, episodesDone: 0, bestEpisode: null },
+    stats: { episode: null, episodesDone: 0, bestEpisode: null, marketHours: 0, schoolHours: 0 },
     achievements: {},
   };
 

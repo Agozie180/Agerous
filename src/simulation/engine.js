@@ -13,6 +13,7 @@ import { runScheduled } from './events.js';
 import { findPath } from './pathing.js';
 import { isRaining } from './hazard.js';
 import { rand } from './rng.js';
+import { weekdayIndex, isSchoolDay } from './geography.js';
 
 const RISE_PER_HOUR = 0.35;     // river rises this fast (m/h) while it rains
 const FALL_PER_HOUR = 0.12;     // and recedes this fast after
@@ -40,6 +41,11 @@ const MEALS = [7, 13, 19];
 function hourly(w) {
   const h = hour(w);
   const { market, election, civil } = w.institutions;
+
+  // Service continuity (daytime hours the school / market were actually open) — feeds the challenge score.
+  w.stats.marketHours ??= 0; w.stats.schoolHours ??= 0;
+  if (market.open && h >= 9 && h < 17 && weekdayIndex(day(w)) <= 5) w.stats.marketHours++;
+  if (w.institutions.school.open && isSchoolDay(day(w)) && h >= 9 && h < 15) w.stats.schoolHours++;
 
   // Work is real: time actually spent at the workplace is what earns a wage.
   for (const n of Object.values(w.npcs)) {
@@ -115,23 +121,30 @@ function hourly(w) {
   }
 }
 
-/** Advance the world by `minutes` simulated minutes (in ≤1-minute slices). */
+/**
+ * Advance the world by `minutes` simulated minutes.
+ *
+ * The simulation only ever moves in WHOLE one-minute ticks; fractional time is carried over.
+ * That makes it independent of frame rate and chunking: the same seed + the same events at the
+ * same tick always give the byte-identical world.  The leaderboard relies on this to verify
+ * scores by replaying them on the server.
+ */
 export function advanceMinutes(world, minutes) {
-  let left = minutes;
-  while (left > 1e-9) {
-    const m = Math.min(1, left);
-    left -= m;
+  world.carry = (world.carry || 0) + minutes;
+  while (world.carry >= 1 - 1e-9) {
+    world.carry -= 1;
     const t0 = world.t;
-    world.t += m;
-    updateEnvironment(world, m);
+    world.t += 1;
+    updateEnvironment(world, 1);
     runScheduled(world);
-    moveNPCs(world, m);
+    moveNPCs(world, 1);
     if (Math.floor(world.t / 15) !== Math.floor(t0 / 15)) refresh(world);
     if (Math.floor(world.t / 60) !== Math.floor(t0 / 60)) hourly(world);
     if (Math.floor(world.t / 1440) !== Math.floor(t0 / 1440)) {
       log(world, `Day ${day(world)} begins.`, 'info');
     }
   }
+  if (world.carry < 0) world.carry = 0;
 }
 
 /** Frame-loop entry point. */

@@ -141,3 +141,51 @@ test('typos and synonyms are understood', () => {
   assert.equal(first('the mayoral race is today').days_until, 0);
   assert.deepEqual(types('the contest was a test of strength'), [], 'fuzzy matching does not invent events');
 });
+
+// ── any provider: custom base URLs ──────────────────────────────────────
+import { chatComplete, endpointFor, normalizeBase, PRESETS } from '../src/simulation/llm.js';
+
+test('llm: base URLs are normalised and endpoints built for both wire formats', () => {
+  assert.equal(endpointFor('openai', 'https://gw.example/v1/'), 'https://gw.example/v1/chat/completions');
+  assert.equal(endpointFor('openai', 'https://gw.example/v1/chat/completions'), 'https://gw.example/v1/chat/completions');
+  assert.equal(endpointFor('anthropic', 'https://relay.example/'), 'https://relay.example/v1/messages');
+  assert.equal(endpointFor('anthropic', 'https://relay.example/v1'), 'https://relay.example/v1/messages');
+  assert.equal(normalizeBase('  http://localhost:11434/v1/  '), 'http://localhost:11434/v1');
+  assert.ok(Object.values(PRESETS).every(p => /^https?:\/\//.test(p.baseUrl) && p.model));
+});
+
+test('llm: interpret() works through a third-party OpenAI-compatible gateway', async () => {
+  let call;
+  const f = async (url, init) => { call = { url, init, body: JSON.parse(init.body) }; return { ok: true, json: async () => ({ choices: [{ message: { content: 'Sure!\n```json\n{"events":[{"event_type":"flood","severity":"low"}]}\n```' } }] }) }; };
+  const r = await interpret('small flood', { baseUrl: 'https://agentrouter.example/v1', apiKey: 'k3y', model: 'cheap-model-1', fetch: f });
+  assert.equal(call.url, 'https://agentrouter.example/v1/chat/completions');
+  assert.equal(call.body.model, 'cheap-model-1');
+  assert.equal(r.source, 'ai');
+  assert.equal(r.events[0].severity, 'low');
+});
+
+test('llm: gateways that reject response_format get a plain retry', async () => {
+  const bodies = [];
+  const f = async (url, init) => { const b = JSON.parse(init.body); bodies.push(b); return b.response_format ? { ok: false, status: 400, json: async () => ({ error: { message: 'unsupported param' } }) } : { ok: true, json: async () => ({ choices: [{ message: { content: '{"events":[{"event_type":"recovery"}]}' } }] }) }; };
+  const out = await chatComplete({ baseUrl: 'https://free.example/v1', model: 'm', system: 's', user: 'u', fetch: f });
+  assert.equal(bodies.length, 2);
+  assert.ok(!bodies[1].response_format);
+  assert.match(out.text, /recovery/);
+});
+
+test('llm: Anthropic-compatible relay uses /v1/messages with both auth headers; no key needed for local servers', async () => {
+  let call;
+  const f = async (url, init) => { call = { url, headers: init.headers }; return { ok: true, json: async () => ({ content: [{ text: '{"events":[]}' }] }) }; };
+  await chatComplete({ style: 'anthropic', baseUrl: 'https://relay.example', apiKey: 'abc', model: 'x', system: 's', user: 'u', fetch: f });
+  assert.equal(call.url, 'https://relay.example/v1/messages');
+  assert.equal(call.headers['x-api-key'], 'abc'); assert.equal(call.headers.Authorization, 'Bearer abc');
+  await chatComplete({ baseUrl: 'http://localhost:11434/v1', model: 'llama3.2', system: 's', user: 'u', fetch: async (u, i) => { call = { headers: i.headers }; return { ok: true, json: async () => ({ choices: [{ message: { content: '{}' } }] }) }; } });
+  assert.ok(!('Authorization' in call.headers));
+});
+
+test('llm: a browser/CORS failure is explained, then the offline rules still answer', async () => {
+  const r = await interpret('A severe flood is coming', { baseUrl: 'https://blocked.example/v1', apiKey: 'k', fetch: async () => { throw new TypeError('Failed to fetch'); } });
+  assert.equal(r.source, 'rules');
+  assert.match(r.notes[0], /CORS/);
+  assert.equal(r.events[0].event_type, 'flood');
+});

@@ -83,7 +83,7 @@ function build() {
     const nn = g.nearestNode(spec.x, spec.z);
     const door = g.node(slot0.x, slot0.z);
     const road = spec.roads[0] ?? `spur:${id}`;
-    if (door !== nn) g.edge(nn, door, road, terrainHeight(spec.x, spec.z));
+    if (door !== nn) { const ei = g.edge(nn, door, road, terrainHeight(spec.x, spec.z)); g.edges[ei].place = id; }
     doors[id] = door;
   }
   return { g, doors };
@@ -94,7 +94,8 @@ export { GRAPH, DOORS };
 
 export function edgeBlocked(edge, env) {
   if (env.blockedRoads && env.blockedRoads[edge.road] != null) return true;
-  return env.stage > edge.elev + WADE_DEPTH;
+  const guard = edge.place ? (env.defenses?.[edge.place] ?? 0) : 0;   // a built defence also raises the approach to its place
+  return env.stage > edge.elev + guard + WADE_DEPTH;
 }
 
 /**

@@ -9,6 +9,7 @@
  * the offline parser takes over, and the result says so (`source`, `notes`).
  */
 
+import { chatComplete, PRESETS, explainNetworkError } from './llm.js';
 import { validateEvents, schemaForPrompt } from './schema.js';
 import { weekdayName } from './geography.js';
 
@@ -204,44 +205,9 @@ async function callProxy(text, cfg, fetchImpl) {
 }
 
 export const PROVIDERS = {
-  openai: { label: 'OpenAI', defaultModel: 'gpt-4o-mini' },
-  anthropic: { label: 'Anthropic', defaultModel: 'claude-haiku-5-5' },
+  openai: { label: 'OpenAI', defaultModel: PRESETS.openai.model },
+  anthropic: { label: 'Anthropic', defaultModel: PRESETS.anthropic.model },
 };
-
-async function callOpenAI(text, cfg, system, fetchImpl) {
-  const res = await fetchImpl('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cfg.apiKey.trim()}` },
-    body: JSON.stringify({
-      model: cfg.model || PROVIDERS.openai.defaultModel,
-      messages: [{ role: 'system', content: system }, { role: 'user', content: text }],
-      temperature: 0, max_tokens: 400, response_format: { type: 'json_object' },
-    }),
-  });
-  if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.error?.message || `HTTP ${res.status}`);
-  const data = await res.json();
-  return data.choices?.[0]?.message?.content ?? '';
-}
-
-async function callAnthropic(text, cfg, system, fetchImpl) {
-  const res = await fetchImpl('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': cfg.apiKey.trim(),
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true',
-    },
-    body: JSON.stringify({
-      model: cfg.model || PROVIDERS.anthropic.defaultModel,
-      max_tokens: 400, temperature: 0, system,
-      messages: [{ role: 'user', content: text }],
-    }),
-  });
-  if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.error?.message || `HTTP ${res.status}`);
-  const data = await res.json();
-  return data.content?.map(b => b.text ?? '').join('') ?? '';
-}
 
 /**
  * Interpret a player's message.
@@ -252,21 +218,26 @@ export async function interpret(text, cfg = {}) {
   const trimmed = String(text ?? '').trim().slice(0, 400);
   if (!trimmed) return { events: [], rejected: [{ reason: 'Type what should happen in the world.' }], notes: [], source: 'none' };
 
-  if (cfg.apiKey || cfg.proxyUrl) {
+  // Any provider: the official APIs, or any OpenAI-/Anthropic-compatible gateway via baseUrl.
+  if (cfg.apiKey || cfg.proxyUrl || cfg.baseUrl) {
     const fetchImpl = cfg.fetch ?? globalThis.fetch;
     const system = buildSystemPrompt(cfg.context);
     try {
-      const rawText = cfg.proxyUrl ? await callProxy(trimmed, cfg, fetchImpl)
-        : cfg.provider === 'anthropic' ? await callAnthropic(trimmed, cfg, system, fetchImpl)
-        : await callOpenAI(trimmed, cfg, system, fetchImpl);
+      const style = cfg.style || (cfg.provider === 'anthropic' ? 'anthropic' : 'openai');
+      let rawText;
+      if (cfg.proxyUrl) rawText = await callProxy(trimmed, cfg, fetchImpl);
+      else {
+        const r = await chatComplete({ style, baseUrl: cfg.baseUrl, apiKey: cfg.apiKey, model: cfg.model, system, user: trimmed, fetch: fetchImpl, browser: true });
+        rawText = r.text; cfg.model = r.model;
+      }
       const v = validateEvents(extractJSON(rawText));
       if (v.events.length || v.rejected.length) {
-        return { ...v, source: 'ai', model: cfg.model || PROVIDERS[cfg.provider ?? 'openai']?.defaultModel || 'proxy', rawText };
+        return { ...v, source: 'ai', model: cfg.model || 'proxy', rawText };
       }
       throw new Error('The model returned no events.');
     } catch (err) {
       const off = interpretOffline(trimmed);
-      return { ...off, notes: [`AI interpreter unavailable (${err.message}) — used the offline rules instead.`, ...off.notes] };
+      return { ...off, notes: [`AI interpreter unavailable (${explainNetworkError(err)}) — used the offline rules instead.`, ...off.notes] };
     }
   }
   return interpretOffline(trimmed);

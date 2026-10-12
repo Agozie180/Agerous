@@ -16,7 +16,7 @@ test('proxy: the key stays server-side, the game still validates the result', as
     assert.equal(r.events.length, 1);
     assert.equal(r.events[0].severity, 'high');
     assert.equal(r.rejected.length, 1, 'hallucinated event dropped by the client-side validator');
-    assert.match(upstream.init.headers.authorization, /sk-secret/);       // key used server-side only
+    assert.match(upstream.init.headers.Authorization, /sk-secret/);       // key used server-side only
     assert.ok(!JSON.stringify(r).includes('sk-secret'), 'key never reaches the browser side');
   } finally { server.close(); }
 });
@@ -29,4 +29,12 @@ test('proxy without a configured key degrades to offline rules', async () => {
     assert.equal(r.source, 'rules');
     assert.match(r.notes[0], /AI interpreter unavailable/);
   } finally { server.close(); }
+});
+
+import { serverLLM } from '../server/handlers.mjs';
+test('server: LLM_BASE_URL selects any gateway from env only; request bodies cannot redirect it', () => {
+  const c = serverLLM({ LLM_BASE_URL: 'https://router.example/v1', LLM_API_KEY: 'k', LLM_MODEL: 'free-model', LLM_API_STYLE: 'anthropic' });
+  assert.deepEqual(c, { style: 'anthropic', baseUrl: 'https://router.example/v1', apiKey: 'k', model: 'free-model' });
+  assert.equal(serverLLM({ OPENAI_API_KEY: 'x' }).style, 'openai');
+  assert.throws(() => serverLLM({}), /no provider key/);
 });

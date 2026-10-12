@@ -28,7 +28,7 @@ test('build: schema rejects hallucinated structures/targets by falling back to s
 test('build: a levee really keeps the market dry in a flood that otherwise swamps it', () => {
   const a = fresh(3), b = fresh(3);
   fire(b, { event_type: 'build', structure: 'levee', target: 'market' });
-  assert.equal(b.defenses.market, 1.0);
+  assert.equal(b.env.defenses.market, 1.0);
   for (const w of [a, b]) fire(w, { event_type: 'flood', severity: 'medium' });
   hours(a, 40); hours(b, 40);
   assert.ok(a.stats.episode?.peakStage >= 2.1 || a.env.stage > 0 || true);
@@ -48,17 +48,17 @@ test('build: you cannot build inside floodwater, and a rejected build changes no
   const w = fresh(3);
   fire(w, { event_type: 'flood', severity: 'high' });
   hours(w, 30);
-  const before = JSON.stringify(w.defenses);
+  const before = JSON.stringify(w.env.defenses);
   const r = queueEvent(w, validateEvent({ event_type: 'build', structure: 'levee', target: 'house_5' }).event);
   assert.equal(r.ok, false);
-  assert.equal(JSON.stringify(w.defenses), before);
+  assert.equal(JSON.stringify(w.env.defenses), before);
 });
 
 test('build + flood + election together: all run concurrently without breaking invariants', () => {
   const w = fresh(5);
   say(w, 'build a levee around the polling station and a severe flood is coming and the election is tomorrow');
   hours(w, 60);
-  assert.ok(w.defenses.polling_station > 0);
+  assert.ok(w.env.defenses.polling_station > 0);
   assert.ok(Number.isFinite(w.env.stage));
   assert.ok(w.elections.length >= 1 || w.institutions.election.state !== 'none');
 });

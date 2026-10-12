@@ -12,12 +12,14 @@
 
 **Say it, and it exists.** Plain language also *builds*: "build a levee around the market" raises a wall in the 3D scene and changes the flood physics. Residents can be talked to, and answer in character from real world state.
 
-**Why it holds up.** 55 automated tests (physics, 30-day autonomy, concurrent-event fuzz, interpreter, persistence), Playwright end-to-end flows, and an honest [AUDIT.md](AUDIT.md).
+**Compete and talk.** Storm Day is a fixed disaster scenario with a leaderboard whose scores are verified by deterministic server-side replay, plus a global chat. Any OpenAI- or Anthropic-compatible provider works via a custom base URL.
+
+**Why it holds up.** 69 automated tests (physics, 30-day autonomy, concurrent-event fuzz, interpreter, persistence), Playwright end-to-end flows, and an honest [AUDIT.md](AUDIT.md).
 
 ## Deliverables checklist
 
 - [x] Public repository — https://github.com/Agozie180/Agerous
-- [ ] Hosted browser demo — import the repo into Vercel, add `OPENAI_API_KEY` (or `ANTHROPIC_API_KEY`) as an env var, deploy. Judges then get real LLM interpretation with no key.
+- [ ] Hosted browser demo — import the repo into Vercel; set `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL` (or `OPENAI_API_KEY`) and add the Upstash Redis integration so the leaderboard and chat are durable; deploy. Judges then get real LLM interpretation with no key.
 - [ ] Demo video, under 3 minutes — script below
 - [x] Written description — above
 - [x] Focus category — above
@@ -28,9 +30,10 @@
 2. **0:20** Show the live flood: river rising, roads going under, the chip strip (school closed, shelter open, campaign running together).
 3. **0:50** Walk view. Click a resident → "why" panel (the decision reason).
 4. **1:15** Type a new sentence yourself: "Build a levee around the market" then "A severe flood is coming" — the market stays dry. Show the interpretation card (events + validation) and the consequence chain.
-5. **1:45** Type nonsense ("summon a dragon") → rejected, world unchanged. Say why that matters.
-6. **2:05** Reload → the town remembers. Show `npm test` (55 passing).
-7. **2:25** Close: AI proposes, validator checks, simulation decides.
+5. **1:45** Open 🏆 Challenge: play Storm Day with one sentence ("send in the clean-up crews"), fast-forward, show the server-verified rank and the leaderboard, post a line in chat.
+6. **2:05** Type nonsense ("summon a dragon") → rejected, world unchanged. Say why that matters.
+7. **2:15** Reload → the town remembers. Show `npm test` (69 passing).
+8. **2:25** Close: AI proposes, validator checks, simulation decides.
 
 ## Honest limits (say them, judges respect it)
 

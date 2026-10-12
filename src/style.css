@@ -113,3 +113,27 @@ button.on { background: var(--accent); color: #04222a; border-color: var(--accen
 #npc-talk { display: flex; gap: 6px; margin-top: 10px; } #npc-talk input { flex: 1; min-width: 0; background: rgba(255,255,255,.07); border: 1px solid var(--line); color: inherit; border-radius: 8px; padding: 7px 9px; font-size: 12px; }
 #npc-talk button { background: var(--accent); color: #04222a; border: 0; border-radius: 8px; padding: 0 12px; font-weight: 700; cursor: pointer; }
 #npc-reply { font-size: 12.5px; line-height: 1.4; margin-top: 8px; } #npc-reply small { color: var(--dim); }
+
+/* ── challenge / leaderboard / chat ───────────────────────────────────── */
+button.hot { background: linear-gradient(90deg, #ffc14d, #ff8a4d); color: #2a1500; border: 0; font-weight: 800; }
+#btn-chat { position: relative; } #chat-dot { position: absolute; top: 2px; right: 2px; width: 9px; height: 9px; border-radius: 50%; background: var(--warn); }
+#chal-bar { position: fixed; top: 74px; left: 50%; transform: translateX(-50%); z-index: 8; display: flex; gap: 14px; align-items: center; padding: 7px 14px; border-radius: 999px; background: var(--bg); border: 1px solid var(--amber); backdrop-filter: blur(8px); font-size: 13px; }
+#chal-bar b { color: var(--amber); letter-spacing: .08em; } #chal-bar button { padding: 3px 10px; font-size: 12px; }
+body.in-challenge #chain { top: 118px; }
+#drawer { position: fixed; top: 80px; right: 14px; bottom: 90px; width: min(380px, 94vw); z-index: 20; display: flex; flex-direction: column; padding: 12px; overflow: hidden; }
+#drawer .tabs { display: flex; gap: 4px; margin-bottom: 8px; } #drawer .tabs button { flex: 1; font-size: 12px; padding: 7px 4px; } #drawer .tabs button.on { background: var(--accent); color: #04222a; } #drawer .tabs #drawer-x { flex: 0 0 34px; }
+#drawer section { flex: 1; overflow: auto; min-height: 0; display: flex; flex-direction: column; }
+#drawer section.hidden { display: none; }
+.namebox { display: flex; gap: 8px; align-items: center; font-size: 11px; color: var(--dim); margin-bottom: 8px; } .namebox input { flex: 1; background: rgba(255,255,255,.07); border: 1px solid var(--line); color: inherit; border-radius: 8px; padding: 6px 8px; }
+#drawer h3 { margin: 4px 0; font-size: 20px; } #drawer .rules { padding-left: 18px; font-size: 12.5px; line-height: 1.6; color: var(--dim); } #drawer .rules b { color: var(--text, #fff); }
+button.big { background: var(--accent); color: #04222a; border: 0; border-radius: 12px; padding: 12px; font-weight: 800; font-size: 15px; cursor: pointer; margin-top: 8px; }
+.fine { font-size: 11px; color: var(--dim); }
+#board table { width: 100%; border-collapse: collapse; font-size: 13px; } #board td { padding: 6px 4px; border-bottom: 1px solid var(--line); } #board td.n { color: var(--dim); width: 26px; } #board td.s { text-align: right; font-weight: 800; color: var(--amber); } #board tr.me td { background: rgba(53,224,255,.12); } #board td small { display: block; color: var(--dim); font-size: 10px; }
+#chat-log { flex: 1; overflow: auto; font-size: 13px; line-height: 1.4; display: flex; flex-direction: column; gap: 4px; padding-right: 4px; } #chat-log div b { color: var(--accent); } #chat-log div.me b { color: var(--amber); }
+#chat-form { display: flex; gap: 6px; margin-top: 8px; } #chat-form input { flex: 1; min-width: 0; background: rgba(255,255,255,.07); border: 1px solid var(--line); color: inherit; border-radius: 8px; padding: 8px; } #chat-form button { background: var(--accent); color: #04222a; border: 0; border-radius: 8px; padding: 0 14px; font-weight: 700; cursor: pointer; }
+#result { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; background: rgba(4,8,16,.82); backdrop-filter: blur(6px); } #result.hidden { display: none; }
+#result-box { width: min(520px, 92vw); background: #0d1424; border: 1px solid var(--line); border-radius: 18px; padding: 22px; text-align: center; }
+#result-box .total { font-size: 64px; font-weight: 900; background: linear-gradient(90deg, var(--accent), var(--amber)); -webkit-background-clip: text; background-clip: text; color: transparent; line-height: 1; } #result-box .rank { font-size: 18px; margin: 6px 0 14px; }
+#result-box .parts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 14px 0; } #result-box .parts div { background: rgba(255,255,255,.06); border-radius: 10px; padding: 8px 4px; font-size: 11px; color: var(--dim); } #result-box .parts b { display: block; font-size: 20px; color: #fff; }
+#result-box .row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 10px; }
+@media (max-width: 700px) { #drawer { top: 120px; bottom: 80px; } }

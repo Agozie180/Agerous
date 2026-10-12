@@ -22,7 +22,8 @@
 - **It remembers.** Reload the page and the water level, votes, positions and history return.
 - **Say it, and it exists.** *"Build a levee around the market"* raises a real wall in 3D **and** changes the flood physics: the same flood that swamps the market now leaves it dry. Sandbags, levee and flood wall have different heights, and a high flood overtops sandbags.
 - **Talk to residents.** Click anyone and ask them something. With an LLM they answer in character, grounded only in facts from the world (needs, activity, river level, town news); without one, rules write the reply. Conversation never changes the world.
-- **Honest.** 55 unit tests, browser end-to-end flows, and an [audit](AUDIT.md) of what was fake before and what is verified now.
+- **Compete.** **🏆 Storm Day** is a fixed town with a fixed disaster (flood + blocked market road + school shut + election in two days). You get 5 sentences. The score (/1000: safety, services, democracy, wellbeing) is **verified by replaying your run on the server**, so it can't be faked. There is a live leaderboard and a global chat.
+- **Honest.** 69 unit tests, browser end-to-end flows, and an [audit](AUDIT.md) of what was fake before and what is verified now.
 
 Type **"A severe flood is coming."** and the river rises over real terrain. Low ground floods first: the fields, the riverside houses, then the market. Roads go under, the supply truck turns back, and the school closes. Civil defence opens the driest reachable building as a shelter, and the residents walk there along the roads that are still open. Once the water falls, they clean up, reopen and go home. All of it is written to a history that survives a page reload.
 
@@ -91,23 +92,47 @@ The **Challenges** panel scores you from world state: bring the town through a f
 - **People walk** along the road graph at a fixed pace. A flooded road can really cut someone off. Every decision carries a human-readable `reason`.
 - **Market economy:** stock, price, sales and customers all come from who can actually arrive. A truck restocks it at 06:00 only if the road is open.
 - **Election:** campaigners persuade the people they meet in the square. Floods and high prices nudge voters. Votes are counted on arrival at the polling station. If the polling station is flooded, the election is postponed.
-- **Determinism:** one seeded RNG lives inside the world, so the same seed and prompts give the same history. That is what makes the 55 tests meaningful.
+- **Determinism:** one seeded RNG lives inside the world, so the same seed and prompts give the same history. That is what makes the 69 tests meaningful.
 - **Memory:** the whole world autosaves to `localStorage`. Reload and the clock, flood, votes, positions and history come back.
 
-## The AI interpreter
+## The AI interpreter — works with any provider
 
-It works **out of the box offline**. To use an LLM, click **AI**, pick a provider, and paste a key. The model is editable, and the defaults are `gpt-4o-mini` and `claude-haiku-5-5`. The LLM never sees or touches the world. Its JSON goes through the same validator as the offline parser, so hallucinated events are dropped. If the call fails, Agerous falls back to the offline rules and tells you so.
+It works **out of the box offline**. To use an LLM, click **AI** and pick:
 
-> The key lives in your browser's localStorage and goes straight to the provider, which is fine for a demo. For a public deployment run `node server/proxy.mjs` (zero dependencies, key stays in `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` on the server) and pick **Server proxy** in the AI dialog.
+| Option | What you enter |
+|---|---|
+| OpenAI / Anthropic | key (+ optional model) |
+| **Any OpenAI-compatible API** | **base URL** + key + model. Presets: OpenRouter, Groq, Together, DeepSeek, Mistral, Gemini, Ollama, LM Studio. Any gateway, router or "free model" relay that speaks `/chat/completions` works. |
+| **Any Anthropic-compatible API** | **base URL** + key + model (`/v1/messages`) |
+| Server proxy | your own deployment URL; the key stays on the server |
+
+Base URLs are normalised (a pasted `.../v1/chat/completions` still works). Gateways that reject `response_format` get an automatic plain retry. The LLM never sees or touches the world: its JSON goes through the same validator as the offline parser, so hallucinated events are dropped. If the call fails (including browser **CORS** blocks, which many gateways have) Agerous falls back to the offline rules and tells you why. For gateways that block browsers, use the server proxy with `LLM_BASE_URL`.
+
+> A key typed into the AI dialog stays in your browser's localStorage and goes only to the base URL you set.
 
 ## Deploy (Vercel)
 
-The repo deploys as-is: Vite static build plus two serverless functions (`api/interpret.js`, `api/npc.js`). Set **one** of `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` in the Vercel project's environment variables (optional: `OPENAI_MODEL` / `ANTHROPIC_MODEL`, `LLM_RATE_PER_MIN`, `ALLOW_ORIGIN`). The deployed site then uses real LLM interpretation and resident voices for every visitor with no key in the browser. With no key configured the game quietly falls back to the offline rules. Locally, `node server/proxy.mjs` serves the same two routes.
+The repo deploys as-is: a Vite static build plus serverless functions in `api/`: `interpret`, `npc`, `leaderboard`, `chat`.
+
+**Environment variables** (Vercel → Settings → Environment Variables):
+
+| Variable | Purpose |
+|---|---|
+| `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL` | **Any** OpenAI-compatible gateway for the hosted demo. Add `LLM_API_STYLE=anthropic` for an Anthropic-compatible one. |
+| *or* `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` (+ `*_MODEL`) | The official APIs |
+| `KV_REST_API_URL` + `KV_REST_API_TOKEN` | **Durable** leaderboard and chat. Add the *Upstash for Redis* integration from the Vercel Marketplace and these are set for you (`UPSTASH_REDIS_REST_URL/TOKEN` also work). Without it, scores and chat live in server memory and reset on restart. The UI says so. |
+| `LLM_RATE_PER_MIN`, `LB_RATE_PER_MIN`, `CHAT_RATE_PER_MIN`, `ALLOW_ORIGIN` | Optional limits |
+| `CHAT_ADMIN_KEY` | Lets you clear the chat: `POST /api/chat {"action":"clear","key":"…"}` |
+| `CHAT_DISABLED=1` | Turn the chat off |
+
+With no LLM variables the game falls back to the offline rules. Locally, run `node server/proxy.mjs` next to `npm run dev` (Vite forwards `/api`) to get every route.
+
+**Why the leaderboard is trustworthy:** the simulation is deterministic and advances in whole one-minute ticks, so the same seed plus the same events at the same ticks always produces the identical world. The browser sends only *what you typed as validated events and when*. The server re-validates them and replays the whole scenario itself (~0.3 s), then computes the score. Client-claimed scores are ignored.
 
 ## Development
 
 ```bash
-npm test          # 55 tests: physics, institutions, autonomy, concurrency fuzz, election, interpreter, proxy, schema, persistence
+npm test          # 69 tests: physics, determinism, replay-verified leaderboard, chat, institutions, autonomy, concurrency fuzz, election, interpreter, proxy, schema, persistence
 npm run build     # production bundle in dist/
 npm run e2e       # Playwright flows A–D against `vite preview` (needs Chromium)
 ```
@@ -124,7 +149,7 @@ e2e/              browser end-to-end script
 
 - The simulation is deliberately small: one valley, 25 residents, rule-based behaviour. These are **rule-driven agents, not autonomous AI agents**.
 - The offline parser understands a fixed vocabulary. The LLM path is covered by mocked tests, because live providers need your key.
-- The visuals are low-poly by design. The production bundle is about 575 kB (three.js is code-split). Rendering quality adapts to frame rate; only software rendering has been measured.
+- The visuals are low-poly by design. The production bundle is about 600 kB (three.js is code-split). Rendering quality adapts to frame rate; only software rendering has been measured.
 - See [AUDIT.md](AUDIT.md) for what the original repo claimed, what was fake, and what is now verified.
 
 ## License

@@ -12,26 +12,25 @@
  * In the game: AI settings → Provider "Proxy" → URL http://localhost:8787/interpret
  */
 import http from 'node:http';
-import { handleInterpret, handleNpc, rateLimited } from './handlers.mjs';
+import { handleInterpret, handleNpc, handleLeaderboard, handleChat, rateLimited } from './handlers.mjs';
 
 export function createProxy({ fetch: fetchImpl = globalThis.fetch, env = process.env } = {}) {
-  const ROUTES = { '/interpret': handleInterpret, '/npc': handleNpc };
+  const LLM = { '/interpret': handleInterpret, '/npc': handleNpc };
+  const SOCIAL = { '/leaderboard': handleLeaderboard, '/chat': handleChat };
   return http.createServer(async (req, res) => {
-    const cors = { 'Access-Control-Allow-Origin': env.ALLOW_ORIGIN || '*', 'Access-Control-Allow-Headers': 'content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
+    const cors = { 'Access-Control-Allow-Origin': env.ALLOW_ORIGIN || '*', 'Access-Control-Allow-Headers': 'content-type', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS' };
     if (req.method === 'OPTIONS') { res.writeHead(204, cors); return res.end(); }
-    const handler = ROUTES[req.url];
-    if (req.method !== 'POST' || !handler) { res.writeHead(404, cors); return res.end('not found'); }
-    if (rateLimited(req.socket.remoteAddress || '?', env)) { res.writeHead(429, cors); return res.end('{"error":"slow down"}'); }
+    const u = new URL(req.url, 'http://x'), ip = req.socket.remoteAddress || '?';
+    const send = (status, json) => { res.writeHead(status, { ...cors, 'content-type': 'application/json' }); res.end(JSON.stringify(json)); };
+    const social = SOCIAL[u.pathname], llm = LLM[u.pathname];
+    if (!social && !(llm && req.method === 'POST')) { res.writeHead(404, cors); return res.end('not found'); }
     let body = '';
-    for await (const c of req) { body += c; if (body.length > 4000) { res.writeHead(413, cors); return res.end(); } }
+    if (req.method === 'POST') for await (const c of req) { body += c; if (body.length > (social ? 20000 : 4000)) { res.writeHead(413, cors); return res.end(); } }
     try {
-      const r = await handler(JSON.parse(body), env, fetchImpl);
-      res.writeHead(r.status, { ...cors, 'content-type': 'application/json' });
-      res.end(JSON.stringify(r.json));
-    } catch (e) {
-      res.writeHead(502, { ...cors, 'content-type': 'application/json' });
-      res.end(JSON.stringify({ error: e.message }));
-    }
+      if (social) { const r = await social({ method: req.method, body: body ? JSON.parse(body) : {}, query: Object.fromEntries(u.searchParams), ip }, env); return send(r.status, r.json); }
+      if (rateLimited(ip, env)) return send(429, { error: 'slow down' });
+      const r = await llm(JSON.parse(body), env, fetchImpl); return send(r.status, r.json);
+    } catch (e) { send(502, { error: e.message }); }
   });
 }
 

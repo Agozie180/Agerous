@@ -26,15 +26,15 @@ const HOMES = ['house_1', 'house_2', 'house_3', 'house_4', 'house_5'];
 
 const HANDLERS = {
   build(w, e) {
-    w.defenses ??= {};
+    w.env.defenses ??= {};
     const h = DEFENSE_HEIGHT[e.structure];
     const targets = e.target === 'homes' ? HOMES : [e.target];
     const built = [], skipped = [];
     for (const id of targets) {
       const name = w.locations[id]?.name ?? id;
       if (w.locations[id]?.flooded) skipped.push(`${name} (already under water)`);
-      else if ((w.defenses[id] ?? 0) >= h) skipped.push(`${name} (already protected as well or better)`);
-      else { w.defenses[id] = h; built.push(name); }
+      else if ((w.env.defenses[id] ?? 0) >= h) skipped.push(`${name} (already protected as well or better)`);
+      else { w.env.defenses[id] = h; built.push(name); }
     }
     if (built.length) log(w, `${STRUCTURE_NAME[e.structure]} goes up around ${built.join(', ')} (+${h.toFixed(1)} m of protection).`, 'major');
     if (skipped.length) log(w, `Nothing built at ${skipped.join(', ')}.`, 'info');

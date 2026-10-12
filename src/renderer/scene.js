@@ -322,7 +322,7 @@ export class GameScene {
   /** Structures the player has built: a wall ring that rises out of the ground, sized by state. */
   _updateDefenses(world, dt) {
     this.defenseMeshes ??= {};
-    for (const [id, h] of Object.entries(world.defenses || {})) {
+    for (const [id, h] of Object.entries(world.env.defenses || {})) {
       let m = this.defenseMeshes[id];
       const spec = LOCATION_SPECS[id];
       if (!m || m.userData.h !== h) {
@@ -336,7 +336,7 @@ export class GameScene {
       }
       if (m.userData.grow < 1) { m.userData.grow = Math.min(1, m.userData.grow + dt / 1.5); m.scale.y = Math.max(0.01, m.userData.grow); m.position.y = locationElevation(id) - 0.15 + ((h + 0.35) * m.scale.y) / 2; }
     }
-    for (const id of Object.keys(this.defenseMeshes)) if (!world.defenses?.[id]) { this.scene.remove(this.defenseMeshes[id]); delete this.defenseMeshes[id]; }
+    for (const id of Object.keys(this.defenseMeshes)) if (!world.env.defenses?.[id]) { this.scene.remove(this.defenseMeshes[id]); delete this.defenseMeshes[id]; }
   }
 
   render() {
@@ -408,11 +408,15 @@ export class GameScene {
       let v = this.people[npc.id];
       if (!v) { v = this.people[npc.id] = this._person(npc); v.position.set(npc.x, terrainHeight(npc.x, npc.z), npc.z); }
       const u = v.userData;
-      const dx = npc.x - u.last.x, dz = npc.z - u.last.z;
-      const moving = dx * dx + dz * dz > 1e-5;
-      u.last.x = npc.x; u.last.z = npc.z;
-      const y = terrainHeight(npc.x, npc.z);
-      v.position.set(npc.x, y, npc.z);
+      // The sim ticks in whole minutes, so glide the model toward its simulated position.
+      u.vx ??= npc.x; u.vz ??= npc.z;
+      const gap = Math.hypot(npc.x - u.vx, npc.z - u.vz);
+      if (gap > 4) { u.vx = npc.x; u.vz = npc.z; } else { const k = 1 - Math.exp(-dt * 14); u.vx += (npc.x - u.vx) * k; u.vz += (npc.z - u.vz) * k; }
+      const dx = u.vx - u.last.x, dz = u.vz - u.last.z;
+      const moving = gap > 0.03;
+      u.last.x = u.vx; u.last.z = u.vz;
+      const y = terrainHeight(u.vx, u.vz);
+      v.position.set(u.vx, y, u.vz);
       if (moving) { v.rotation.y = Math.atan2(dx, dz); u.phase += dt * 11; } else u.phase += dt * 0.3;
       const swing = moving ? Math.sin(u.phase) * 0.45 : 0;
       u.legs[0].rotation.x = swing; u.legs[1].rotation.x = -swing;

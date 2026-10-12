@@ -9,7 +9,7 @@ export const FLOOD_DEPTH = 0.3;
 export const RISK_MARGIN = 0.3;
 
 /** Metres of protection a built defence adds around a place (see the `build` event). */
-export const defenseOf = (w, id) => w.defenses?.[id] ?? 0;
+export const defenseOf = (w, id) => w.env.defenses?.[id] ?? 0;
 export const effectiveElevation = (w, id) => locationElevation(id) + defenseOf(w, id);
 
 export const isRaining = w => w.env.rainUntil != null && w.t < w.env.rainUntil;

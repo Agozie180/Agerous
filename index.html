@@ -31,6 +31,8 @@
     <div id="tools">
       <button id="btn-view" title="Toggle walk / sky view (Tab)">Sky view</button>
       <button id="btn-ai" title="AI interpreter settings">AI</button>
+      <button id="btn-chal" class="hot" title="Storm Day challenge + leaderboard">🏆 Challenge</button>
+      <button id="btn-chat" title="Global chat">💬<i id="chat-dot" class="hidden"></i></button>
       <button id="btn-help" title="What is this?">?</button>
       <button id="btn-new" title="Start a new world">New world</button>
     </div>
@@ -48,6 +50,24 @@
 
   <div id="npc-card" class="panel hidden"></div>
   <div id="talk-hint" class="hidden"></div>
+
+  <div id="chal-bar" class="hidden"><b>🏆 STORM DAY</b><span id="chal-left"></span><span id="chal-clock"></span><button id="chal-quit">Exit</button></div>
+
+  <aside id="drawer" class="hidden panel">
+    <div class="tabs"><button data-tab="challenge" class="on">🏆 Challenge</button><button data-tab="board">📊 Leaderboard</button><button data-tab="chat">💬 Chat</button><button id="drawer-x" title="Close">×</button></div>
+    <label class="namebox">Your name <input id="player-name" maxlength="20" autocomplete="off" /></label>
+    <section id="tab-challenge">
+      <h3>Storm Day</h3>
+      <p id="chal-brief"></p>
+      <ul class="rules"><li>Same town, same storm for every player.</li><li>You get <b>5 sentences</b>. Pause any time to think.</li><li>Score /1000: safety · services · democracy · wellbeing.</li><li>The server <b>replays your run</b> to verify the score — it can't be faked.</li></ul>
+      <button id="chal-start" class="big">▶ Start Storm Day</button>
+      <p class="fine" id="chal-best"></p>
+    </section>
+    <section id="tab-board" class="hidden"><div id="board"></div><p class="fine" id="board-note"></p></section>
+    <section id="tab-chat" class="hidden"><div id="chat-log"></div><form id="chat-form"><input id="chat-input" maxlength="200" placeholder="Say hi to other players…" autocomplete="off" /><button>Send</button></form><p class="fine" id="chat-note"></p></section>
+  </aside>
+
+  <div id="result" class="hidden"><div id="result-box"></div></div>
 
   <div id="chain" class="hidden" aria-live="polite"></div>
   <div id="caption" class="hidden"></div>
@@ -88,14 +108,23 @@
   <div id="modal" class="hidden">
     <div id="modal-box">
       <h2>AI interpreter</h2>
-      <p>Agerous understands plain language <b>offline</b> with built-in rules. Add your own key and an LLM interprets your prompts instead — but it can only emit events from a fixed schema, which are validated before the simulation runs them.</p>
+      <p>Agerous understands plain language <b>offline</b> with built-in rules. Add your own key — official or any third-party gateway with a base URL (OpenRouter, Groq, DeepSeek, Ollama, AgentRouter-style relays…) — and an LLM interprets your prompts instead — but it can only emit events from a fixed schema, which are validated before the simulation runs them.</p>
       <label>Provider
-        <select id="ai-provider"><option value="">Offline rules (no key)</option><option value="openai">OpenAI</option><option value="anthropic">Anthropic</option><option value="proxy">My own proxy (key stays on the server)</option></select>
+        <select id="ai-provider">
+          <option value="">Offline rules (no key)</option>
+          <option value="openai">OpenAI</option>
+          <option value="anthropic">Anthropic</option>
+          <option value="compat">Any OpenAI-compatible API (custom base URL)</option>
+          <option value="compat_anthropic">Any Anthropic-compatible API (custom base URL)</option>
+          <option value="proxy">My own server proxy (key stays on the server)</option>
+        </select>
       </label>
+      <label id="lbl-preset" class="hidden">Quick preset <select id="ai-preset"></select></label>
+      <label id="lbl-base" class="hidden">Base URL <input id="ai-base" type="text" placeholder="https://your-gateway.example/v1" autocomplete="off" /></label>
       <label id="lbl-proxy" class="hidden">Proxy URL <input id="ai-proxy" type="text" placeholder="http://localhost:8787/interpret" /></label>
       <label id="lbl-key">API key <input id="ai-key" type="password" placeholder="sk-…" autocomplete="off" /></label>
       <label>Model <input id="ai-model" type="text" placeholder="default" /></label>
-      <p class="fine">The key is stored only in this browser's localStorage and sent only to the provider you pick. For a public deployment put a small proxy in front instead (see README).</p>
+      <p class="fine">The key is stored only in this browser's localStorage and sent only to the base URL you set. If a gateway blocks browsers (CORS) use the server proxy: set LLM_BASE_URL / LLM_API_KEY / LLM_MODEL on the server (see README).</p>
       <div class="row"><button id="ai-save">Save</button><button id="ai-close" class="ghost">Close</button></div>
     </div>
   </div>
