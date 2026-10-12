@@ -5,16 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>AGEROUS — describe what happens, watch the world live through it</title>
   <meta name="description" content="A 3D browser game where you describe events in plain language and a small living town reacts to them for real." />
+  <meta property="og:title" content="AGEROUS — describe what happens, watch the world live through it" />
+  <meta property="og:description" content="A 3D browser game: type an event in plain language and a living town reacts for real — floods, elections, schools, markets, shelters." />
+  <meta property="og:image" content="docs/social.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230a0e18'/%3E%3Cpath d='M12 46 L32 14 L52 46 Z' fill='none' stroke='%2335e0ff' stroke-width='6' stroke-linejoin='round'/%3E%3Cpath d='M10 52 q11 -8 22 0 t22 0' fill='none' stroke='%23ffc14d' stroke-width='5'/%3E%3C/svg%3E" />
   <link rel="stylesheet" href="/src/style.css" />
 </head>
 <body>
   <canvas id="world-canvas"></canvas>
 
   <header id="hud-top">
-    <div id="brand">AGEROUS</div>
+    <div id="brand">AGEROUS<small>describe what happens</small></div>
     <div id="clock"><b id="clock-time">08:00</b><span id="clock-day">Day 1 · Monday</span></div>
     <div id="weather"><span id="weather-icon">☀</span><span id="weather-label">Clear</span></div>
     <div id="alert" class="hidden"></div>
+    <div id="now" title="Everything happening in the town right now — they all run together"></div>
     <div id="score" title="Community wellbeing: safety, food and social need of every resident"><b id="score-val">–</b><span>WELLBEING</span></div>
     <div id="speed">
       <button data-speed="0" title="Pause">⏸</button>
@@ -25,6 +31,7 @@
     <div id="tools">
       <button id="btn-view" title="Toggle walk / sky view (Tab)">Sky view</button>
       <button id="btn-ai" title="AI interpreter settings">AI</button>
+      <button id="btn-help" title="What is this?">?</button>
       <button id="btn-new" title="Start a new world">New world</button>
     </div>
   </header>
@@ -41,6 +48,23 @@
 
   <div id="npc-card" class="panel hidden"></div>
   <div id="talk-hint" class="hidden"></div>
+
+  <div id="chain" class="hidden" aria-live="polite"></div>
+  <div id="caption" class="hidden"></div>
+
+  <div id="intro">
+    <div id="intro-box">
+      <div class="logo">AGEROUS</div>
+      <h1>Type what happens.<br/><span>A living 3D town reacts — for real.</span></h1>
+      <div class="steps">
+        <div><b>1</b><i>✍</i><span>You describe an event<br/><em>“A severe flood is coming”</em></span></div>
+        <div><b>2</b><i>🧠</i><span>AI turns it into a<br/>validated event</span></div>
+        <div><b>3</b><i>🌍</i><span>The simulation runs it:<br/>water, roads, people, rules</span></div>
+      </div>
+      <p>School, market, church and homes run on their own every day. Your sentence changes the world they live in — and the town remembers.</p>
+      <div class="cta"><button id="intro-demo">▶ Watch a flood unfold <small>30 s · no setup</small></button><button id="intro-play" class="ghost">Play it yourself</button></div>
+    </div>
+  </div>
 
   <section id="prompt">
     <div id="interp" class="hidden"></div>
@@ -65,9 +89,10 @@
       <h2>AI interpreter</h2>
       <p>Agerous understands plain language <b>offline</b> with built-in rules. Add your own key and an LLM interprets your prompts instead — but it can only emit events from a fixed schema, which are validated before the simulation runs them.</p>
       <label>Provider
-        <select id="ai-provider"><option value="">Offline rules (no key)</option><option value="openai">OpenAI</option><option value="anthropic">Anthropic</option></select>
+        <select id="ai-provider"><option value="">Offline rules (no key)</option><option value="openai">OpenAI</option><option value="anthropic">Anthropic</option><option value="proxy">My own proxy (key stays on the server)</option></select>
       </label>
-      <label>API key <input id="ai-key" type="password" placeholder="sk-…" autocomplete="off" /></label>
+      <label id="lbl-proxy" class="hidden">Proxy URL <input id="ai-proxy" type="text" placeholder="http://localhost:8787/interpret" /></label>
+      <label id="lbl-key">API key <input id="ai-key" type="password" placeholder="sk-…" autocomplete="off" /></label>
       <label>Model <input id="ai-model" type="text" placeholder="default" /></label>
       <p class="fine">The key is stored only in this browser's localStorage and sent only to the provider you pick. For a public deployment put a small proxy in front instead (see README).</p>
       <div class="row"><button id="ai-save">Save</button><button id="ai-close" class="ghost">Close</button></div>

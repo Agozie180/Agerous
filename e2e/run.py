@@ -2,7 +2,7 @@
 Usage: python3 e2e/run.py http://localhost:4173/ [shots_dir]"""
 import sys, json, os
 from playwright.sync_api import sync_playwright
-url = sys.argv[1]; shots = sys.argv[2] if len(sys.argv) > 2 else 'e2e/shots'
+url = sys.argv[1] + ('?play' if '?' not in sys.argv[1] else ''); shots = sys.argv[2] if len(sys.argv) > 2 else 'e2e/shots'
 os.makedirs(shots, exist_ok=True)
 errors = []; fails = []
 def check(name, cond, info=''):

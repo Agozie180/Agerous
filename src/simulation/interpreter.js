@@ -14,6 +14,36 @@ import { weekdayName } from './geography.js';
 
 // ─── Offline interpreter ────────────────────────────────────────────────
 
+/** Words the parser knows.  Typos within edit distance are snapped to these. */
+const LEXICON = ['flood', 'flooding', 'flooded', 'election', 'elections', 'school', 'market', 'church', 'service', 'storm', 'shipment', 'delivery',
+  'tomorrow', 'closed', 'sunny', 'rain', 'raining', 'exam', 'exams', 'vote', 'voting', 'severe', 'massive', 'minor', 'cloudy', 'students', 'teachers',
+  'candidates', 'campaign', 'blocked', 'recovery', 'cleanup', 'reopen', 'drizzle', 'hurricane', 'sunday', 'tonight', 'harvest', 'strike'];
+const SYNONYMS = [[/\b(tsunami|torrent\w*|deluge|dam (?:burst|broke|failure))\b/g, 'flood'], [/\b(polling day|go to the polls|mayoral race|ballot box)\b/g, 'election'],
+  [/\b(kids? (?:stay|stays) home|no (?:classes|lessons)|classes? (?:are )?(?:off|cancel\w*))\b/g, 'school closed'],
+  [/\b(trucks? (?:of )?(?:food|goods|supplies) (?:arrive|arrives|arrived|came|come))\b/g, 'shipment arrived'], [/\b(mass|worship)\b/g, 'service']];
+
+function editDistance(a, b) {          // Damerau–Levenshtein (adjacent swaps count as one edit)
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+  for (let j = 0; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) {
+    const c = a[i - 1] === b[j - 1] ? 0 : 1;
+    d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + c);
+    if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+  }
+  return d[a.length][b.length];
+}
+export function normalize(text) {
+  let t = String(text).toLowerCase();
+  for (const [rx, to] of SYNONYMS) t = t.replace(rx, to);
+  return t.replace(/[a-z]{6,}/g, w => {
+    if (LEXICON.includes(w)) return w;
+    const max = w.length >= 8 ? 2 : 1;
+    let best = null, bd = max + 1;
+    for (const k of LEXICON) { if (Math.abs(k.length - w.length) > max) continue; const e = editDistance(w, k); if (e < bd) { bd = e; best = k; } }
+    return best ?? w;
+  });
+}
+
 const WORD_NUM = { a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7 };
 const num = s => (/^\d+$/.test(s) ? Number(s) : WORD_NUM[s] ?? null);
 
@@ -56,7 +86,7 @@ const RX = {
 };
 
 function parseClause(raw) {
-  let c = raw.toLowerCase().trim();
+  let c = normalize(raw).trim();
   if (!c) return null;
   // "due to the flood" is a CAUSE, not a new flood.
   let cause = '';
@@ -146,6 +176,14 @@ function extractJSON(text) {
   throw new Error('The model did not return JSON.');
 }
 
+async function callProxy(text, cfg, fetchImpl) {
+  const res = await fetchImpl(cfg.proxyUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, context: cfg.context }) });
+  if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.error || `HTTP ${res.status}`);
+  const data = await res.json();
+  cfg.model = data.model;
+  return data.rawText ?? '';
+}
+
 export const PROVIDERS = {
   openai: { label: 'OpenAI', defaultModel: 'gpt-4o-mini' },
   anthropic: { label: 'Anthropic', defaultModel: 'claude-haiku-5-5' },
@@ -195,16 +233,16 @@ export async function interpret(text, cfg = {}) {
   const trimmed = String(text ?? '').trim().slice(0, 400);
   if (!trimmed) return { events: [], rejected: [{ reason: 'Type what should happen in the world.' }], notes: [], source: 'none' };
 
-  if (cfg.apiKey) {
+  if (cfg.apiKey || cfg.proxyUrl) {
     const fetchImpl = cfg.fetch ?? globalThis.fetch;
     const system = buildSystemPrompt(cfg.context);
     try {
-      const rawText = cfg.provider === 'anthropic'
-        ? await callAnthropic(trimmed, cfg, system, fetchImpl)
+      const rawText = cfg.proxyUrl ? await callProxy(trimmed, cfg, fetchImpl)
+        : cfg.provider === 'anthropic' ? await callAnthropic(trimmed, cfg, system, fetchImpl)
         : await callOpenAI(trimmed, cfg, system, fetchImpl);
       const v = validateEvents(extractJSON(rawText));
       if (v.events.length || v.rejected.length) {
-        return { ...v, source: 'ai', model: cfg.model || PROVIDERS[cfg.provider ?? 'openai'].defaultModel, rawText };
+        return { ...v, source: 'ai', model: cfg.model || PROVIDERS[cfg.provider ?? 'openai']?.defaultModel || 'proxy', rawText };
       }
       throw new Error('The model returned no events.');
     } catch (err) {

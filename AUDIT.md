@@ -33,7 +33,7 @@ Done on the original commit (`ffee5b0`), then repeated after the rebuild.
 | Persistence | Save → load → run on gives an identical future (unit test). Browser flow D reloads the page and gets back the clock, flood level and history through the real autosave. |
 | Real 3D native browser game | `npm run e2e`: walkable avatar, sky view, inspector, minimap, the prompt box, no console errors. |
 
-Counts: 37 unit tests pass, browser flows A–D pass.
+Counts: 46 unit tests pass (incl. 30-day autonomy and concurrent-event fuzz runs), browser flows A–D pass.
 
 ## Known gaps (not hidden)
 

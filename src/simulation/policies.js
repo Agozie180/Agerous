@@ -161,6 +161,7 @@ const dist = (n, id) => Math.hypot(n.x - LOCATION_SPECS[id].x, n.z - LOCATION_SP
 
 function updateSchool(w) {
   const s = w.institutions.school;
+  const students = Object.values(w.npcs).filter(n => n.occupation === 'student');
   if (s.exam && s.examUntil != null && w.t >= s.examUntil) { s.exam = false; s.examUntil = null; log(w, 'Exams are over.', 'info'); }
   const reasons = [];
   if (s.eventClosedUntil != null && w.t < s.eventClosedUntil) reasons.push(s.eventReason || 'closed by order');
@@ -169,11 +170,19 @@ function updateSchool(w) {
     if (findPath(w.env, SQUARE, 'school') === null) reasons.push('road to school is under water');
     if (atRisk(w, 'school')) reasons.push('flood warning: school at risk');
   }
-  const students = Object.values(w.npcs).filter(n => n.occupation === 'student');
   const affected = students.filter(n => atRisk(w, n.home) || w.locations[n.home].flooded).length;
   if (students.length && affected / students.length >= 0.4) reasons.push(`${affected} of ${students.length} students live in the flood zone`);
   if (w.institutions.civil.shelters.includes('school')) reasons.push('being used as a shelter');
 
+  // A school needs a teacher.  Checked once lessons should be under way (09:00–15:00 on a school day).
+  const d = day(w), h = hourF(w);
+  const inRoom = Object.values(w.npcs).filter(n => n.location === 'school');
+  const teacherThere = Object.values(w.npcs).some(n => n.occupation === 'teacher' && (n.location === 'school' || (n.dest === 'school' && n.path.length > 0)));
+  if (s.open && reasons.length === 0 && (isSchoolDay(d) || s.exam) && h >= 10 && h < 15 && !teacherThere) {
+    s.noTeacherDay = d; log(w, 'Lessons cancelled: no teacher made it to school.', 'warn');
+  }
+  if (s.noTeacherDay === d) reasons.push('no teacher at school');
+  if (h >= 14.75 && h < 15 && (isSchoolDay(d) || s.exam) && students.length) s.attendance = Math.round(100 * inRoom.filter(n => n.occupation === 'student').length / students.length);
   const open = reasons.length === 0;
   if (open !== s.open) {
     log(w, open ? 'School reopens.' : `School closed: ${reasons.join('; ')}.`, open ? 'good' : 'major');
@@ -189,6 +198,13 @@ function updateMarket(w) {
   if (m.disruptedUntil != null && w.t < m.disruptedUntil) reasons.push('disrupted');
   if (w.locations.market.flooded) reasons.push('market flooded / being cleaned');
   else if (findPath(w.env, SQUARE, 'market') === null) reasons.push('road to the market is cut');
+  // A market needs people behind the stalls (checked from 09:30 Mon–Sat).
+  const d = day(w), h = hourF(w);
+  const staff = Object.values(w.npcs).some(n => ['vendor', 'parent'].includes(n.occupation) && (n.location === 'market' || (n.dest === 'market' && n.path.length > 0)));
+  if (m.open && reasons.length === 0 && weekdayIndex(d) < 6 && h >= 10 && h < 17 && !staff) {
+    m.noStaffDay = d; log(w, 'Nobody is running the stalls — the market stays shut today.', 'warn');
+  }
+  if (m.noStaffDay === d) reasons.push('no vendors turned up');
   const open = reasons.length === 0;
   if (open !== m.open) log(w, open ? 'Market reopens.' : `Market closed: ${reasons.join('; ')}.`, open ? 'good' : 'major');
   m.open = open; m.reasons = reasons;
@@ -209,6 +225,10 @@ function updateChurch(w) {
   }
   if (c.service && w.locations.church.flooded) { log(w, 'Church service cancelled: flooded.', 'warn'); c.service = null; }
   // Sunday service is on the calendar: congregation starts walking at 07:45 for 09:00–11:00.
+  const priest = Object.values(w.npcs).some(n => n.occupation === 'priest' && n.location === 'church');
+  if (c.service && !c.service.begun && w.t >= c.service.startT && !priest && c.cancelledDay !== d) {
+    c.cancelledDay = d; log(w, 'Service cancelled: the priest could not reach the church.', 'warn'); c.service = null;
+  }
   if (!c.service && isSunday(d) && h >= 7.5 && h < 11 && c.lastSundayDay !== d && !w.locations.church.flooded) {
     c.lastSundayDay = d;
     c.service = { kind: 'sunday', startT: dayStartT(d) + 9 * 60, endT: dayStartT(d) + 11 * 60, begun: false };

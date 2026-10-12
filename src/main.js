@@ -33,7 +33,7 @@ export async function runPrompt(text) {
   busy = true; $('prompt-go').disabled = true;
   try {
     const ai = readAI();
-    const result = await interpret(text, { provider: ai.provider, apiKey: ai.key, model: ai.model, context: { day: day(world), hour: hour(world) } });
+    const result = await interpret(text, { provider: ai.provider, apiKey: ai.key, model: ai.model, proxyUrl: ai.provider === 'proxy' ? ai.proxy : undefined, context: { day: day(world), hour: hour(world) } });
     const outcomes = result.events.map(e => queueEvent(world, e));
     log(world, `You: “${text.trim()}”${result.events.length ? '' : ' (nothing happened)'}`, 'you');
     world.prompts.push({ t: world.t, text: text.trim(), source: result.source, events: result.events, rejected: result.rejected.length });
@@ -68,13 +68,19 @@ setSpeed(world.timeSpeed);
 // ── AI settings ─────────────────────────────────────────────────────────
 $('btn-ai').onclick = () => {
   const s = readAI();
-  $('ai-provider').value = s.provider || ''; $('ai-key').value = s.key || ''; $('ai-model').value = s.model || '';
+  $('ai-provider').value = s.provider || ''; $('ai-key').value = s.key || ''; $('ai-model').value = s.model || ''; $('ai-proxy').value = s.proxy || '';
+  syncProviderFields();
   $('modal').classList.remove('hidden');
 };
+function syncProviderFields() { const p = $('ai-provider').value; $('lbl-proxy').classList.toggle('hidden', p !== 'proxy'); $('lbl-key').classList.toggle('hidden', p === 'proxy' || !p); }
+$('ai-provider').onchange = syncProviderFields;
 $('ai-close').onclick = () => $('modal').classList.add('hidden');
 $('ai-save').onclick = () => {
-  const provider = $('ai-provider').value, key = $('ai-key').value.trim(), model = $('ai-model').value.trim();
-  try { if (!provider || !key) localStorage.removeItem(AI_KEY); else localStorage.setItem(AI_KEY, JSON.stringify({ provider, key, model: model || PROVIDERS[provider].defaultModel })); } catch { /* storage blocked */ }
+  const provider = $('ai-provider').value, key = $('ai-key').value.trim(), model = $('ai-model').value.trim(), proxy = $('ai-proxy').value.trim();
+  try {
+    if (!provider || (provider === 'proxy' ? !proxy : !key)) localStorage.removeItem(AI_KEY);
+    else localStorage.setItem(AI_KEY, JSON.stringify({ provider, key, proxy, model: model || PROVIDERS[provider]?.defaultModel })); } catch { /* storage blocked */ }
+  $('btn-ai').classList.toggle('on', !!readAI().provider);
   $('modal').classList.add('hidden');
 };
 
@@ -90,6 +96,38 @@ $('world-canvas').addEventListener('pointerup', e => {
   const id = gs.pickPerson({ x: (e.clientX / innerWidth) * 2 - 1, y: -(e.clientY / innerHeight) * 2 + 1 });
   if (id) ui.npcCard(world.npcs[id], world); else ui.clearSelection();
 });
+
+// ── 10-second onboarding + scripted demo ─────────────────────────────────
+const intro = $('intro');
+const closeIntro = () => { intro.classList.add('gone'); try { localStorage.setItem('agerous.seen', '1'); } catch { /* ignore */ } };
+let seen = false; try { seen = !!localStorage.getItem('agerous.seen'); } catch { /* ignore */ }
+if (seen || new URLSearchParams(location.search).has('play')) intro.classList.add('gone');
+$('intro-play').onclick = closeIntro;
+$('btn-help').onclick = () => intro.classList.remove('gone');
+let demoToken = 0;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+function caption(text, sub = '') { const c = $('caption'); c.innerHTML = text ? `${esc2(text)}${sub ? `<small>${esc2(sub)}</small>` : ''}` : ''; c.classList.toggle('hidden', !text); }
+const esc2 = s => String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+async function runDemo() {
+  const me = ++demoToken; closeIntro();
+  clearSave(); world = startWorld(createWorld(7)); ui.histLen = 0; ui.clearSelection(); setSpeed(10);
+  if (player.mode !== 'sky') toggleView();
+  const skip = document.createElement('button'); skip.id = 'demo-skip'; skip.textContent = 'Skip demo ✕';
+  skip.onclick = () => { demoToken++; }; document.body.appendChild(skip);
+  const live = () => demoToken === me;
+  try {
+    caption('A normal morning in Agerous', 'school · market · church · homes — all running on their own'); await sleep(3500); if (!live()) return;
+    caption('');
+    typeDemo('A severe flood is coming and the election is tomorrow'); await sleep(1200); if (!live()) return;
+    await runPrompt('A severe flood is coming and the election is tomorrow');
+    caption('One sentence → two validated events', 'flood + election, running together'); await sleep(3500); if (!live()) return;
+    setSpeed(40); caption('');
+    await sleep(14000); if (!live()) return;
+    caption('Water, roads, shelters, votes — all simulated', 'not scripted. Try your own sentence.'); await sleep(4000);
+  } finally { caption(''); skip.remove(); input.value = ''; if (live()) setSpeed(10); }
+}
+async function typeDemo(text) { input.value = ''; for (const ch of text) { if (!document.getElementById('demo-skip')) break; input.value += ch; await sleep(22); } }
+$('intro-demo').onclick = runDemo;
 
 // ── frame loop ──────────────────────────────────────────────────────────
 let last = performance.now(), lastSave = last;

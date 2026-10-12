@@ -141,9 +141,11 @@ test('market sells to customers who can arrive; a blocked road kills sales and s
   toTime(b, 2, 7);
   assert.ok(said(b, /supply truck/), 'supply truck turned back');
   assert.ok(b.institutions.market.stock <= stockBefore);
-  // hunger accumulates because the market is shut
-  const hungry = by(b, n => n.needs.food < 0.35).length;
-  assert.ok(hungry >= 1, 'shoppers got hungry');
+  // cupboards run down while the market is shut, and people go hungry
+  fire(b, { event_type: 'market_disruption', road_blocked: true, duration_days: 3 });
+  toTime(b, 4, 21);
+  assert.ok(by(b, n => n.needs.food < 0.35).length >= 1, 'households ran out of food');
+  assert.ok(Object.values(b.households).some(h => h.pantry < 4));
 });
 
 test('shipment raises stock and lowers prices', () => {

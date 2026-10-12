@@ -62,7 +62,10 @@ export function decide(world, npc) {
   }
 
   // 5 ── CHURCH ───────────────────────────────────────────────────────────
-  if (occ === 'priest' && !L.church.flooded) return out('church', 'working', 'Tends the church.');
+  if (occ === 'priest' && !L.church.flooded) {
+    if (needsGroceries(w, home) && win(h, 11, 15) && wd < 6 && market.open && reach('market')) return out('market', 'shopping', 'The pantry at the church is empty. Going to the market.');
+    return out('church', 'working', 'Tends the church.');
+  }
   const sv = church.service;
   if (sv && t >= sv.startT - 90 && t < sv.endT && npc.churchGoer && !L.church.flooded) {
     const eligible = sv.kind === 'sunday' || !['student', 'teacher', 'vendor'].includes(occ);
@@ -92,14 +95,18 @@ export function decide(world, npc) {
       if (market.open && reach('market')) return out('market', 'working', 'Running a stall.');
       return out(home, 'staying_home', `Can't open the stall: ${market.reasons.join('; ') || 'road to the market is cut'}.`);
     }
-    const cost = Math.round(8 * market.price);
-    if (!['student', 'priest'].includes(occ) && npc.needs.food < 0.7 && win(h, 9, 17)) {
-      if (market.open && market.stock >= 3 && npc.money >= cost && reach('market')) {
-        return out('market', 'shopping', `Hungry (food ${Math.round(npc.needs.food * 100)}%). Going to the market.`);
+    // Parents help on the stalls until lunchtime (and buy for the household while there).
+    if (occ === 'parent' && win(h, 7.5, 13) && market.open && reach('market')) {
+      return out('market', 'working', 'Helping on a stall.');
+    }
+    if (shopperOf(w, npc.home) === npc.id && needsGroceries(w, npc.home) && win(h, 9, 17)) {
+      const cost = basketCost(market);
+      if (market.open && market.stock >= BASKET_STOCK && householdCash(w, npc.home) >= cost && reach('market')) {
+        return out('market', 'shopping', `The ${nm(npc.home)} cupboard is nearly empty. Going to the market.`);
       }
       note = market.open
-        ? (market.stock < 3 ? 'Wants to shop but the market is out of stock. ' : (npc.money < cost ? 'Wants to shop but cannot afford it. ' : 'Wants to shop but cannot reach the market. '))
-        : `Wants to shop but the market is closed (${market.reasons.join('; ')}). `;
+        ? (market.stock < BASKET_STOCK ? 'Needs groceries but the market is out of stock. ' : (householdCash(w, npc.home) < cost ? 'Needs groceries but cannot afford them. ' : 'Needs groceries but cannot reach the market. '))
+        : `Needs groceries but the market is closed (${market.reasons.join('; ')}). `;
     }
   }
 
@@ -113,8 +120,10 @@ export function decide(world, npc) {
   }
 
   // 10 ── EVENING SOCIAL ──────────────────────────────────────────────────
-  if (win(h, 17, 21) && (npc.slot + d) % 3 === 0 && !L.town_square.flooded && reach('town_square')) {
-    return out('town_square', 'idle', 'Meeting neighbours in the square.');
+  // Lonely people go looking for company: the evenings, and weekend afternoons.
+  const freeTime = win(h, 17, 21) || (wd >= 5 && win(h, 13, 19));
+  if (freeTime && npc.needs.social < 0.65 && !L.town_square.flooded && reach('town_square')) {
+    return out('town_square', 'idle', `Feeling isolated (social ${Math.round(npc.needs.social * 100)}%). Heading to the square.`);
   }
 
   return out(home, 'idle', `${note}At ${nm(home)}.`);
@@ -187,18 +196,45 @@ export function castVote(world, npc) {
   return true;
 }
 
+export const BASKET_STOCK = 4;          // market stock one basket uses
+export const BASKET_MEALS = 12;         // meals one basket gives a household
+export const basketCost = m => Math.round(38 * m.price);
+export const membersOf = (w, home) => Object.values(w.npcs).filter(n => n.home === home);
+/** Households pool their money: elders and children don't starve because they don't earn. */
+export const householdCash = (w, home) => membersOf(w, home).reduce((a, n) => a + n.money, 0);
+function payHousehold(w, home, cost) {
+  if (householdCash(w, home) < cost) return false;
+  let left = cost;
+  for (const n of membersOf(w, home).sort((a, b) => b.money - a.money)) {
+    const take = Math.min(n.money, left); n.money -= take; left -= take; if (left <= 0) break;
+  }
+  return true;
+}
+export const needsGroceries = (w, home) => w.households[home].pantry < membersOf(w, home).length * 3;
+const SHOPPER_ORDER = ['elder', 'farmer', 'worker', 'priest'];
+/** The household member who does the shopping: someone not already tied to a stall or a classroom. */
+export function shopperOf(w, home) {
+  const m = membersOf(w, home).filter(n => SHOPPER_ORDER.includes(n.occupation))
+    .sort((a, b) => SHOPPER_ORDER.indexOf(a.occupation) - SHOPPER_ORDER.indexOf(b.occupation) || a.id.localeCompare(b.id));
+  return m[0]?.id ?? null;
+}
+
+/** Buy groceries for the buyer's household: up to two baskets, while stock, money and cupboard space allow. */
 export function purchase(world, npc) {
   const m = world.institutions.market;
-  const cost = Math.round(8 * m.price);
+  const hh = world.households[npc.home];
+  const members = membersOf(world, npc.home).length;
   if (!m.open) { npc.reason = 'The market closed before they arrived.'; return false; }
-  if (m.stock < 3) { npc.reason = 'The market is out of stock.'; return false; }
-  if (npc.money < cost) { npc.reason = 'Could not afford the goods.'; return false; }
-  npc.money -= cost;
-  m.stock -= 3;
-  m.salesToday += 1; m.customersToday += 1; m.revenueToday += cost;
-  npc.needs.food = Math.min(1, npc.needs.food + 0.55);
-  npc.reason = `Bought food for ${cost}.`;
-  return true;
+  let bought = 0;
+  while (bought < 2 && hh.pantry < members * 6) {
+    const cost = basketCost(m);
+    if (m.stock < BASKET_STOCK) { npc.reason = bought ? 'Bought what was left.' : 'The market is out of stock.'; break; }
+    if (!payHousehold(world, npc.home, cost)) { npc.reason = bought ? 'Bought what they could afford.' : 'Could not afford the goods.'; break; }
+    m.stock -= BASKET_STOCK; hh.pantry += BASKET_MEALS;
+    m.salesToday += 1; m.revenueToday += cost; bought++;
+  }
+  if (bought) { m.customersToday += 1; npc.reason = `Bought ${bought} basket${bought > 1 ? 's' : ''} for the household.`; }
+  return bought > 0;
 }
 
 /** Re-plan everyone; called every simulated quarter-hour and after any event. */

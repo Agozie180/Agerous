@@ -33,7 +33,7 @@ export class UI {
     if (this._acc > 0.25) {
       this._acc = 0;
       $('score-val').textContent = communityScore(world);
-      this.status(world); this.challenges(world); this.history(world); this.minimap(world, player);
+      this.status(world); this.now(world); this.chain(world); this.challenges(world); this.history(world); this.minimap(world, player);
       if (this.selected && world.npcs[this.selected]) this.npcCard(world.npcs[this.selected], world);
     }
   }
@@ -51,6 +51,35 @@ export class UI {
       ['🗳 Election', this.electionText(w, election), election.state === 'polling' ? 'good' : ''],
     ];
     $('status-rows').innerHTML = rows.map(([a, b, c]) => `<div class="row-s ${c}"><span>${a}</span><span>${esc(b)}</span></div>`).join('');
+  }
+
+  /** Chips: everything running right now — they all run together. */
+  now(w) {
+    const { school, market, church, civil, election } = w.institutions;
+    const chips = [];
+    if (civil.alert >= 1) chips.push(['w', `🌊 ${['', 'Flood watch', 'Flood warning', 'Flood emergency'][civil.alert]}`]);
+    if (w.env.rain > 0.05) chips.push(['a', '🌧 Raining']);
+    if (civil.shelters.length) chips.push(['g', `🏠 ${civil.shelters.length} shelter${civil.shelters.length > 1 ? 's' : ''}`]);
+    if (election.state === 'campaign') chips.push(['a', '🗳 Campaign']);
+    if (election.state === 'polling') chips.push(['g', '🗳 Polls open']);
+    chips.push([school.open ? 'g' : 'w', school.open ? '🏫 School' : '🏫 School closed']);
+    chips.push([market.open ? 'g' : 'w', market.open ? '🛒 Market' : '🛒 Market shut']);
+    if (church.service?.begun || civil.shelters.includes('church')) chips.push(['g', '⛪ Church']);
+    const html = chips.map(([c, t]) => `<span class="${c}">${t}</span>`).join('');
+    if (html !== this._nowHtml) { $('now').innerHTML = html; this._nowHtml = html; }
+  }
+
+  /** Consequence chain: what your last sentence set off, as it happens. */
+  chain(w) {
+    const box = $('chain');
+    let i = w.history.length - 1;
+    while (i >= 0 && w.history[i].kind !== 'you') i--;
+    if (i < 0 || w.t - w.history[i].t > 360) { box.classList.add('hidden'); this._chainHtml = ''; return; }
+    const items = [w.history[i], ...w.history.slice(i + 1).filter(e => ['warn', 'major', 'good'].includes(e.kind))].slice(0, 6);
+    const short = t => (t.length > 46 ? t.slice(0, 44) + '…' : t);
+    const html = items.map((e, k) => `${k ? '<span class="arr">→</span>' : ''}<span class="c ${e.kind === 'you' ? 'you' : e.kind}">${esc(short(e.text))}</span>`).join('');
+    if (html === this._chainHtml) return;
+    box.innerHTML = html; box.classList.remove('hidden'); this._chainHtml = html;
   }
 
   electionText(w, e) {

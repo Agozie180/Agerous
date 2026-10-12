@@ -82,10 +82,11 @@ function makeNPCs(world, rand) {
       activity: 'idle',
       reason: 'Just waking up.',
       money: 80 + Math.floor(rand() * 220),
-      needs: { food: 0.4 + rand() * 0.6, safety: 1, social: 0.5 + rand() * 0.4 },
+      needs: { food: 0.6 + rand() * 0.4, safety: 1, social: 0.5 + rand() * 0.4 },
       // election-related
       leaning: (hash01(id) - 0.5) * 1.2,   // <0 leans candidate A, >0 candidate B
       intends: true, voteHour: 8 + Math.floor(rand() * 8), voted: false,
+      workedMin: 0, wageToday: 0,
       slot: i + 1,
     };
   });
@@ -111,10 +112,10 @@ export function createWorld(seed = 1337) {
 
     locations: {},
     institutions: {
-      school:   { open: true, reasons: [], eventClosedUntil: null, exam: false, examUntil: null },
+      school:   { open: true, reasons: [], eventClosedUntil: null, exam: false, examUntil: null, noTeacherDay: null, attendance: null },
       market:   { open: true, reasons: [], disruptedUntil: null, stock: 80, price: 1.0,
-                  salesToday: 0, revenueToday: 0, customersToday: 0, customersYesterday: 0, supplyBlockedLogged: false },
-      church:   { service: null, lastAttendance: null },
+                  salesToday: 0, revenueToday: 0, customersToday: 0, customersYesterday: 0, supplyBlockedLogged: false, noStaffDay: null, harvested: 0 },
+      church:   { service: null, lastAttendance: null, cancelledDay: null },
       civil:    { alert: 0, evacuation: false, shelters: [], assign: {}, forecast: 0 },
       election: { state: 'none', electionDay: null, announcedT: null, postponements: 0,
                   candidates: [
@@ -125,6 +126,7 @@ export function createWorld(seed = 1337) {
     },
     elections: [],            // archive of concluded elections
     npcs: {},
+    households: {},          // home id -> { pantry } — meals in the cupboard
     scheduled: [],            // [{ t, event }]
     history: [],
     prompts: [],              // what the player asked & how it was interpreted
@@ -144,6 +146,7 @@ export function createWorld(seed = 1337) {
 
   const rand = () => rngNext(world);
   world.npcs = makeNPCs(world, rand);
+  for (const id of new Set(Object.values(world.npcs).map(n => n.home))) world.households[id] = { pantry: 12 + Math.floor(rand() * 13) };
 
   log(world, 'Day 1 · Monday. The community of Agerous wakes up.', 'info');
   return world;

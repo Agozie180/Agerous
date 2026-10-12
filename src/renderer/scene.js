@@ -318,7 +318,25 @@ export class GameScene {
     if (this.pollFlag) this.pollFlag.material.color.setHex(world.institutions.election.state === 'polling' ? 0x2ecc71 : 0x777777);
   }
 
-  render() { this.renderer.render(this.scene, this.camera); }
+  render() {
+    this.renderer.render(this.scene, this.camera);
+    this._adaptQuality();
+  }
+
+  /** Keep it playable on modest GPUs: if the frame rate sags, drop shadow detail and pixel ratio. */
+  _adaptQuality() {
+    const now = performance.now();
+    this._fps ??= { last: now, frames: 0, level: 0, ok: 0 };
+    const f = this._fps; f.frames++;
+    if (now - f.last < 2000) return;
+    const fps = (f.frames * 1000) / (now - f.last); f.last = now; f.frames = 0; this.fps = Math.round(fps);
+    if (fps < 28 && f.level < 2) {
+      f.level++;
+      if (f.level === 1) { this.sun.shadow.mapSize.set(1024, 1024); this.sun.shadow.map?.dispose(); this.sun.shadow.map = null; this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25)); }
+      else { this.renderer.shadowMap.enabled = false; this.renderer.setPixelRatio(1); this.scene.traverse(o => { if (o.material) o.material.needsUpdate = true; }); }
+      this._resize();
+    }
+  }
 
   _updateWater(world, dt) {
     const target = world.env.stage;

@@ -1,10 +1,26 @@
 # AGEROUS
 
-> **Describe what happens. Watch the world live through it.**
+### Type what happens. A living 3D town reacts — for real.
 
-Agerous is a 3D game that runs in your browser. You walk around a small valley town, and you play it by **typing events in plain language**. The town does not play an animation. It *runs the consequences*.
+**A browser-native 3D game where plain language is the controller.** Say *"A severe flood is coming and the election is tomorrow"* and the river rises over real terrain, roads go under, the school closes, civil defence opens a shelter, and 25 residents decide for themselves whether to flee, vote, or go to work.
 
-![The town in a severe flood](docs/flood.png)
+![30-second demo: one sentence, a whole town reacts](docs/demo.gif)
+
+| ✍ You type | 🧠 AI proposes | ✅ Schema validates | 🌍 Simulation decides | 🎥 3D renders |
+|---|---|---|---|---|
+| any sentence | structured events only | unknown → rejected, numbers clamped | physics + rules + needs | reads state, never writes it |
+
+**The one idea:** the AI never touches the world. It only *proposes* events; a validator and a deterministic simulation decide what they mean. That is why it is safe, testable and reproducible.
+
+**Try it in 10 seconds:** open the page → press **▶ Watch a flood unfold**. No key, no install, no account.
+
+## What makes it different from "an AI game"
+
+- **Everything runs together.** School, market, church, homes, the river and an election are all live at once. Floods close the market *and* the polling station *and* the school, and the town works through it.
+- **The town lives without you.** 30 simulated days with no input: teachers teach, vendors sell, farmers harvest, people eat and get paid, Sunday service fills the pews. Take away the teacher and lessons really cancel.
+- **Causality you can see.** A chip strip shows what is running; a chain of consequences (*You → flood → Main Road impassable → shelter opened*) appears after every sentence; click anyone to read **why** they are doing what they do.
+- **It remembers.** Reload the page and the water level, votes, positions and history return.
+- **Honest.** 46 unit tests, browser end-to-end flows, and an [audit](AUDIT.md) of what was fake before and what is verified now.
 
 Type **"A severe flood is coming."** and the river rises over real terrain. Low ground floods first: the fields, the riverside houses, then the market. Roads go under, the supply truck turns back, and the school closes. Civil defence opens the driest reachable building as a shelter, and the residents walk there along the roads that are still open. Once the water falls, they clean up, reopen and go home. All of it is written to a history that survives a page reload.
 
@@ -73,19 +89,19 @@ The **Challenges** panel scores you from world state: bring the town through a f
 - **People walk** along the road graph at a fixed pace. A flooded road can really cut someone off. Every decision carries a human-readable `reason`.
 - **Market economy:** stock, price, sales and customers all come from who can actually arrive. A truck restocks it at 06:00 only if the road is open.
 - **Election:** campaigners persuade the people they meet in the square. Floods and high prices nudge voters. Votes are counted on arrival at the polling station. If the polling station is flooded, the election is postponed.
-- **Determinism:** one seeded RNG lives inside the world, so the same seed and prompts give the same history. That is what makes the 37 tests meaningful.
+- **Determinism:** one seeded RNG lives inside the world, so the same seed and prompts give the same history. That is what makes the 46 tests meaningful.
 - **Memory:** the whole world autosaves to `localStorage`. Reload and the clock, flood, votes, positions and history come back.
 
 ## The AI interpreter
 
 It works **out of the box offline**. To use an LLM, click **AI**, pick a provider, and paste a key. The model is editable, and the defaults are `gpt-4o-mini` and `claude-haiku-5-5`. The LLM never sees or touches the world. Its JSON goes through the same validator as the offline parser, so hallucinated events are dropped. If the call fails, Agerous falls back to the offline rules and tells you so.
 
-> The key lives in your browser's localStorage and goes straight to the provider. That is fine for a demo. For a public deployment, put a tiny proxy in front of the provider call and keep the key server-side.
+> The key lives in your browser's localStorage and goes straight to the provider, which is fine for a demo. For a public deployment run `node server/proxy.mjs` (zero dependencies, key stays in `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` on the server) and pick **Server proxy** in the AI dialog.
 
 ## Development
 
 ```bash
-npm test          # 37 tests: physics, institutions, election, interpreter, schema, persistence
+npm test          # 46 tests: physics, institutions, autonomy, concurrency fuzz, election, interpreter, proxy, schema, persistence
 npm run build     # production bundle in dist/
 npm run e2e       # Playwright flows A–D against `vite preview` (needs Chromium)
 ```
@@ -102,7 +118,7 @@ e2e/              browser end-to-end script
 
 - The simulation is deliberately small: one valley, 25 residents, rule-based behaviour. These are **rule-driven agents, not autonomous AI agents**.
 - The offline parser understands a fixed vocabulary. The LLM path is covered by mocked tests, because live providers need your key.
-- The visuals are low-poly by design. The deployed bundle is about 540 kB.
+- The visuals are low-poly by design. The production bundle is about 575 kB (three.js is code-split). Rendering quality adapts to frame rate; only software rendering has been measured.
 - See [AUDIT.md](AUDIT.md) for what the original repo claimed, what was fake, and what is now verified.
 
 ## License

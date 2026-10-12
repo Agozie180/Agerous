@@ -131,3 +131,13 @@ test('network failure / bad key / garbage → offline rules take over and say so
     assert.match(r.notes[0], /AI interpreter unavailable/);
   }
 });
+
+test('typos and synonyms are understood', () => {
+  assert.equal(first('a severe floood is comming').event_type, 'flood');
+  assert.equal(first('the electon is tomorow').event_type, 'election');
+  assert.equal(first('shcool is closed tomorrow').event_type, 'school_closure');
+  assert.equal(first('a tsunami hits').event_type, 'flood');
+  assert.equal(first('kids stay home tomorrow').event_type, 'school_closure');
+  assert.equal(first('the mayoral race is today').days_until, 0);
+  assert.deepEqual(types('the contest was a test of strength'), [], 'fuzzy matching does not invent events');
+});

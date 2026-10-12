@@ -4,10 +4,8 @@ export default defineConfig({
   base: './',
   build: {
     outDir: 'dist',
-    assetsInlineLimit: 0,
+    chunkSizeWarningLimit: 700,
+    rollupOptions: { output: { manualChunks: { three: ['three'] } } },
   },
-  server: {
-    port: 5173,
-    open: true,
-  },
+  server: { port: 5173 },
 });
