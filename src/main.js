@@ -16,7 +16,13 @@ import { UI } from './ui/ui.js';
 
 const $ = id => document.getElementById(id);
 const AI_KEY = 'agerous.ai';
-const readAI = () => { try { return JSON.parse(localStorage.getItem(AI_KEY)) || {}; } catch { return {}; } };
+// A hosted deployment can bake in a server-side proxy (VITE_PROXY_URL) so judges get real LLM
+// interpretation with no key. A user's own saved settings always win.
+const DEFAULT_PROXY = import.meta.env?.VITE_PROXY_URL || '';
+const readAI = () => {
+  try { const s = JSON.parse(localStorage.getItem(AI_KEY)); if (s && s.provider) return s; } catch { /* ignore */ }
+  return DEFAULT_PROXY ? { provider: 'proxy', proxy: DEFAULT_PROXY } : {};
+};
 
 let world = loadWorld();
 const resumed = !!world;
