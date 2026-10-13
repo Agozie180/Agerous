@@ -2,7 +2,7 @@
 
 **Goal:** win Victoria VR's *AI Builder Hackathon 2026* (submit by **Nov 11, 2026 16:30 CEST**). Deliverables: public repo ✔, hosted demo ☐, <3 min demo video ☐ (owner records it), written description ✔ (`SUBMISSION.md`), focus category ✔.
 
-**Rules for any assistant continuing this:** commits must be authored by `Agozie180 <166037570+Agozie180@users.noreply.github.com>` only — no Claude author/co-author trailers. Push to `origin main` (https://github.com/Agozie180/Agerous).
+**Rules for any assistant continuing this:** commits must be authored by `Agozie180 <137266828+Agozie180@users.noreply.github.com>` only (set `git config user.email` to that) — no AI-assistant author or co-author trailers of any kind. Push to `origin main` (https://github.com/Agozie180/Agerous).
 
 ## What exists (all pushed, 69 unit tests passing)
 - Vite + three.js 3D town; `npm run dev`, `npm test`, `npm run build`, `npm run e2e`.
