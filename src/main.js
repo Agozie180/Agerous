@@ -17,6 +17,8 @@ import { GameScene } from './renderer/scene.js';
 import { Player } from './renderer/player.js';
 import { UI } from './ui/ui.js';
 import { askResident } from './simulation/talk.js';
+import { Soundscape } from './audio.js';
+import { initTouch } from './ui/touch.js';
 
 const $ = id => document.getElementById(id);
 const AI_KEY = 'agerous.ai';
@@ -49,6 +51,10 @@ if (!world) world = startWorld(createWorld(Date.now() % 100000));
 const gs = new GameScene($('world-canvas'));
 const player = new Player(gs);
 const ui = new UI();
+const sound = new Soundscape();
+gs.onThunder = () => sound.thunder();
+const touch = initTouch(player);
+if (touch) { $('controls').textContent = 'Left stick: move · drag the scene: look · Talk appears near people'; $('prompt-input').placeholder = 'Describe an event…'; }
 let busy = false;
 let challenge = false, finished = false;
 ui.onTyping = v => { player.typing = v; };
@@ -72,6 +78,7 @@ export async function runPrompt(text) {
     world.prompts.push({ t: world.t, text: text.trim(), source: result.source, events: result.events, rejected: result.rejected.length });
     world.prompts = world.prompts.slice(-30);
     ui.showInterpretation(result, outcomes);
+    sound.blip(result.events.length > 0 && !outcomes.some(o => o && o.ok === false));
     if (!challenge) saveWorld(world);
     return { result, outcomes };
   } finally { busy = false; $('prompt-go').disabled = false; }
@@ -92,7 +99,11 @@ window.addEventListener('keydown', e => {
   else if (e.code === 'KeyE') { const n = player.nearestNPC(world); if (n) ui.npcCard(n, world); }
   else if (e.code === 'Space') { e.preventDefault(); setSpeed(world.timeSpeed === 0 ? 10 : 0); }
 });
-function toggleView() { $('btn-view').textContent = player.toggleMode() === 'walk' ? 'Sky view' : 'Walk view'; }
+$('btn-talk').onclick = () => { const n = player.nearestNPC(world); if (n) ui.npcCard(n, world); };
+const paintSound = () => { $('btn-sound').textContent = sound.muted ? '🔇' : '🔊'; $('btn-sound').classList.toggle('muted', sound.muted); };
+$('btn-sound').onclick = () => { sound.setMuted(!sound.muted); paintSound(); };
+paintSound();
+function toggleView() { const m = player.toggleMode(); document.body.classList.toggle('sky', m === 'sky'); $('btn-view').textContent = m === 'walk' ? 'Sky view' : 'Walk view'; }
 $('btn-view').onclick = toggleView;
 function setSpeed(v) { world.timeSpeed = v; document.querySelectorAll('#speed button').forEach(b => b.classList.toggle('on', Number(b.dataset.speed) === v)); }
 document.querySelectorAll('#speed button').forEach(b => b.addEventListener('click', () => setSpeed(Number(b.dataset.speed))));
@@ -247,6 +258,7 @@ function frame(now) {
     else if (now - lastBar > 300) { lastBar = now; updateChalBar(); }
   } else step(world, dt);
   player.update(world, dt);
+  sound.update(world);
   gs.update(world, { selectedId: ui.selected, focus: player.focus });
   gs.render();
   ui.update(world, dt, player);
@@ -259,4 +271,4 @@ window.addEventListener('beforeunload', () => { if (!challenge) saveWorld(world)
 if (resumed) log(world, 'Welcome back — the world remembered where you left off.', 'good');
 
 // handle for tests and curious judges: window.agerous.world / .say("…")
-window.agerous = { get world() { return world; }, say: runPrompt, player, scene: gs, ui, get challenge() { return challenge; }, startChallenge: () => startChallenge() };
+window.agerous = { get world() { return world; }, say: runPrompt, player, scene: gs, ui, sound, get challenge() { return challenge; }, startChallenge: () => startChallenge() };

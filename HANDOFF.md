@@ -11,15 +11,16 @@
 - Residents decide by rules; talk to them (`talk.js`, LLM-voiced when available).
 - **Any provider:** `src/simulation/llm.js` — OpenAI/Anthropic official or any compatible base URL; server env `LLM_BASE_URL/LLM_API_KEY/LLM_MODEL[/LLM_API_STYLE]`.
 - **Storm Day challenge** (`scenario.js`) + **leaderboard verified by server replay** + **global chat** (`server/handlers.mjs`, `server/store.mjs`, `api/*.js`, `src/ui/social.js`). Durable storage needs Upstash/Vercel KV env vars; otherwise in-memory.
+- Polish pass: `src/audio.js` (Web Audio soundscape), `src/ui/touch.js` (joystick), lightning in `scene.js`, `UI.trend()` graph, `public/social.png` + `SITE_URL` og:image.
 - Docs: `README.md`, `AUDIT.md`, `SUBMISSION.md` (pitch, checklist, video script).
 
 ## Still to do
 1. Deploy to Vercel; set env vars (LLM_* and the Upstash/KV integration). Share the live URL.
 2. On the live site confirm the interpretation card says "Interpreted by AI", a resident reply says "AI-voiced", and a leaderboard score appears after a Storm Day run.
-3. Re-run `npm run e2e` against the final build (needs `node server/proxy.mjs` on :8787 and `vite preview` on :4173; the last e2e run after the doc edits was not confirmed).
+3. ✔ `npm run e2e` re-run on the polished build: 28/28 pass (needs `node server/proxy.mjs` on :8787 and `vite preview` on :4173).
 4. Paste the GitHub About description/topics manually (API writes were blocked) and upload `docs/social.png` as the social preview.
 5. Owner records the <3 min video (script in `SUBMISSION.md`).
-6. Optional polish: more Storm Day levers (e.g. building on roads), sound, mobile touch controls, per-resident LLM memory.
+6. ✔ Done in the polish pass: procedural sound, lightning, wellbeing graph, phone controls, share-image fix. Optional next: more Storm Day levers (e.g. building on roads), per-resident LLM memory.
 
 ## Honest limits
 Resident *decisions* are rules, not LLM agents. Live third-party LLM calls are only mock-tested. Frame rate measured on software rendering only. Public API key + chat need a spend cap and moderation.

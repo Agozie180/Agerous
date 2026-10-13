@@ -314,6 +314,7 @@ export class GameScene {
     this._updateDefenses(world, dt);
     this._updatePeople(world, dt, extra.selectedId);
     this._updateSky(world);
+    this._updateLightning(world, dt);
     this._updateRain(world, dt, extra.focus);
     this.banners.visible = world.institutions.election.state === 'campaign';
     if (this.pollFlag) this.pollFlag.material.color.setHex(world.institutions.election.state === 'polling' ? 0x2ecc71 : 0x777777);
@@ -450,6 +451,23 @@ export class GameScene {
     this.scene.background.copy(sky); this.scene.fog.color.copy(sky);
     this.scene.fog.near = 60 - gloom * 30; this.scene.fog.far = 190 - gloom * 90;
     this.sun.target.position.set(0, 0, 0);
+  }
+
+  /** Storm flashes: a sharp strike, a smaller echo and a fading glow that light the whole valley; then onThunder (audio). */
+  _updateLightning(world, dt) {
+    this._flash ??= 0; this._nextBolt ??= 3 + Math.random() * 4;
+    if (weatherOf(world) === 'storm' && world.timeSpeed > 0 && world.timeSpeed <= 40) {
+      this._nextBolt -= dt;
+      if (this._nextBolt <= 0) { this._flash = 1; this._nextBolt = 6 + Math.random() * 12; this.onThunder?.(); }
+    }
+    this._flash = Math.max(0, this._flash - dt * 1.7);
+    if (this._flash <= 0) return;
+    const t = 1 - this._flash, pulse = (c, w) => Math.max(0, 1 - Math.abs(t - c) / w);
+    const f = Math.max(pulse(0.05, 0.12), 0.8 * pulse(0.3, 0.14), 0.45 * pulse(0.55, 0.2));
+    if (f <= 0) return;
+    this.hemi.intensity += f * 2.6;
+    this.scene.background.lerp(this._white ??= new THREE.Color(0xdfe8ff), Math.min(1, f * 0.7));
+    this.scene.fog.color.copy(this.scene.background);
   }
 
   _updateRain(world, dt, focus) {

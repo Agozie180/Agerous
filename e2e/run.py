@@ -92,7 +92,29 @@ with sync_playwright() as p:
     pg.click('#drawer .tabs button[data-tab=chat]'); pg.fill('#chat-input', 'hello from the e2e test'); pg.press('#chat-input', 'Enter'); pg.wait_for_timeout(1500)
     check('G6 chat message round-trips', 'hello from the e2e test' in pg.inner_text('#chat-log'))
     pg.screenshot(path=f'{shots}/09_chat.png')
-    pg.evaluate("agerous.world.timeSpeed = 0")
+    # ---- Flow H: sound, wellbeing graph, lightning, mobile touch controls
+    pg.click('#btn-sound'); muted = state(pg, "agerous.sound.muted"); pg.click('#btn-sound')
+    check('H1 sound toggle mutes and unmutes, audio context runs', muted is True and state(pg, "agerous.sound.muted") is False and state(pg, "agerous.sound.ctx && agerous.sound.ctx.state") == 'running')
+    check('H2 wellbeing graph is sampling the world', state(pg, "agerous.ui._tr && agerous.ui._tr.pts.length") >= 1)
+    lum = state(pg, """(async()=>{const s=agerous.scene,l=()=>{const c=s.scene.background;return c.r+c.g+c.b};const base=l();let mx=base;s._flash=1;
+        await new Promise(r=>{const t0=performance.now();const f=()=>{mx=Math.max(mx,l());performance.now()-t0>900?r():requestAnimationFrame(f)};f()});return mx-base})()""")
+    check('H3 lightning flash brightens the sky', lum > 0.1, round(lum, 3))
+    pg.close()                                   # software WebGL: don't render two scenes at once
+    m = b.new_context(viewport={"width":390,"height":844}, has_touch=True, is_mobile=True).new_page()
+    m.on("pageerror", lambda e: errors.append("MOBILE PAGEERROR " + str(e)))
+    m.goto(sys.argv[1] + '?play'); m.wait_for_function("window.agerous && window.agerous.world", timeout=45000); m.wait_for_timeout(1000)
+    check('H4 phone gets touch UI: joystick visible, chips scroll', m.evaluate("document.body.classList.contains('touch') && getComputedStyle(document.getElementById('joystick')).display === 'block' && document.getElementById('chips').scrollWidth > document.getElementById('chips').clientWidth"))
+    x0, z0 = m.evaluate("[agerous.player.x, agerous.player.z]")
+    m.evaluate("""()=>{const pad=document.getElementById('joystick'),r=pad.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;
+        const ev=(t,x,y)=>pad.dispatchEvent(new PointerEvent(t,{pointerId:7,clientX:x,clientY:y,bubbles:true,isPrimary:true}));
+        pad.setPointerCapture=()=>{};ev('pointerdown',cx,cy);ev('pointermove',cx,cy-46);window.__up=()=>ev('pointerup',cx,cy)}""")
+    m.wait_for_timeout(1500); m.evaluate("window.__up()")
+    x1, z1 = m.evaluate("[agerous.player.x, agerous.player.z]")
+    check('H5 joystick walks the player and releases cleanly', ((x1-x0)**2+(z1-z0)**2)**.5 > 0.5 and m.evaluate("agerous.player.joy.x === 0 && agerous.player.joy.y === 0"))
+    m.fill('#prompt-input', 'A severe flood is coming'); m.click('#prompt-go'); m.wait_for_timeout(900)
+    top = m.evaluate("document.getElementById('chain').getBoundingClientRect().top - document.getElementById('hud-top').getBoundingClientRect().bottom")
+    check('H6 phone: consequence banner clears the top bar', top >= 0, round(top))
+    m.screenshot(path=f'{shots}/10_mobile.png')
     check('no console errors', not errors, '; '.join(errors[:3]))
     b.close()
 print('\nFAILED:', fails if fails else 'none'); sys.exit(1 if fails else 0)

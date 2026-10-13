@@ -14,7 +14,9 @@
 
 **Compete and talk.** Storm Day is a fixed disaster scenario with a leaderboard whose scores are verified by deterministic server-side replay, plus a global chat. Any OpenAI- or Anthropic-compatible provider works via a custom base URL.
 
-**Why it holds up.** 69 automated tests (physics, 30-day autonomy, concurrent-event fuzz, interpreter, persistence), Playwright end-to-end flows, and an honest [AUDIT.md](AUDIT.md).
+**Feels alive.** Procedural storm audio (rain, wind, river, thunder timed to lightning, church bell, alert tones), a wellbeing-over-time graph that marks each sentence you typed, and touch controls so it plays on a phone.
+
+**Why it holds up.** 69 automated tests (physics, 30-day autonomy, concurrent-event fuzz, interpreter, persistence), 28 Playwright end-to-end checks (including a phone viewport), and an honest [AUDIT.md](AUDIT.md).
 
 ## Deliverables checklist
 
@@ -32,6 +34,7 @@
 4. **1:15** Type a new sentence yourself: "Build a levee around the market" then "A severe flood is coming" — the market stays dry. Show the interpretation card (events + validation) and the consequence chain.
 5. **1:45** Open 🏆 Challenge: play Storm Day with one sentence ("send in the clean-up crews"), fast-forward, show the server-verified rank and the leaderboard, post a line in chat.
 6. **2:05** Type nonsense ("summon a dragon") → rejected, world unchanged. Say why that matters.
+6b. **2:10** Point at the *Wellbeing over time* graph: each amber marker is a sentence you typed, the blue area is the river. Turn the sound on (🔊) before recording to get the thunder.
 7. **2:15** Reload → the town remembers. Show `npm test` (69 passing).
 8. **2:25** Close: AI proposes, validator checks, simulation decides.
 

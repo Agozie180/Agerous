@@ -22,6 +22,9 @@
 - **It remembers.** Reload the page and the water level, votes, positions and history return.
 - **Say it, and it exists.** *"Build a levee around the market"* raises a real wall in 3D **and** changes the flood physics: the same flood that swamps the market now leaves it dry. Sandbags, levee and flood wall have different heights, and a high flood overtops sandbags.
 - **Talk to residents.** Click anyone and ask them something. With an LLM they answer in character, grounded only in facts from the world (needs, activity, river level, town news); without one, rules write the reply. Conversation never changes the world.
+- **Cause and effect on one chart.** A *Wellbeing over time* graph sits under the town panel, with river level behind the line and a marker at every sentence you typed, so you can see what each one did.
+- **A storm you can hear.** Rain, wind, river, thunder after real lightning flashes, a church bell for services and shelters, and warning tones — all synthesised live with Web Audio (no audio files). Toggle with 🔊.
+- **Plays on a phone.** On touch devices you get a thumb joystick, a Talk button, scrolling prompt chips and a layout that fits a small screen (add `?touch` to force it).
 - **Compete.** **🏆 Storm Day** is a fixed town with a fixed disaster (flood + blocked market road + school shut + election in two days). You get 5 sentences. The score (/1000: safety, services, democracy, wellbeing) is **verified by replaying your run on the server**, so it can't be faked. There is a live leaderboard and a global chat.
 - **Honest.** 69 unit tests, browser end-to-end flows, and an [audit](AUDIT.md) of what was fake before and what is verified now.
 
@@ -124,6 +127,7 @@ The repo deploys as-is: a Vite static build plus serverless functions in `api/`:
 | `LLM_RATE_PER_MIN`, `LB_RATE_PER_MIN`, `CHAT_RATE_PER_MIN`, `ALLOW_ORIGIN` | Optional limits |
 | `CHAT_ADMIN_KEY` | Lets you clear the chat: `POST /api/chat {"action":"clear","key":"…"}` |
 | `CHAT_DISABLED=1` | Turn the chat off |
+| `SITE_URL` | Optional. Absolute site URL for the social-preview image (`og:image`). On Vercel the production URL is picked up automatically. |
 
 With no LLM variables the game falls back to the offline rules. Locally, run `node server/proxy.mjs` next to `npm run dev` (Vite forwards `/api`) to get every route.
 
@@ -134,7 +138,7 @@ With no LLM variables the game falls back to the offline rules. Locally, run `no
 ```bash
 npm test          # 69 tests: physics, determinism, replay-verified leaderboard, chat, institutions, autonomy, concurrency fuzz, election, interpreter, proxy, schema, persistence
 npm run build     # production bundle in dist/
-npm run e2e       # Playwright flows A–D against `vite preview` (needs Chromium)
+npm run e2e       # Playwright flows A–H (flood, election, invalid input, persistence, building, talking, Storm Day + leaderboard + chat, sound/graph/lightning/phone) against `vite preview` (needs Chromium)
 ```
 
 ```

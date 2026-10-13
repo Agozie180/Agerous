@@ -33,6 +33,7 @@ export class UI {
     if (this._acc > 0.25) {
       this._acc = 0;
       $('score-val').textContent = communityScore(world);
+      this.trend(world);
       this.status(world); this.now(world); this.chain(world); this.challenges(world); this.history(world); this.minimap(world, player);
       if (this.selected && world.npcs[this.selected]) this.npcCard(world.npcs[this.selected], world);
     }
@@ -51,6 +52,39 @@ export class UI {
       ['🗳 Election', this.electionText(w, election), election.state === 'polling' ? 'good' : ''],
     ];
     $('status-rows').innerHTML = rows.map(([a, b, c]) => `<div class="row-s ${c}"><span>${a}</span><span>${esc(b)}</span></div>`).join('');
+  }
+
+  /**
+   * Wellbeing over time, with the river level behind it and a marker wherever you typed a sentence —
+   * so cause and effect can be read off one small chart. Samples live in the UI, not in world state.
+   */
+  trend(w) {
+    const T = this._tr;
+    if (!T || T.world !== w || w.t < T.last) this._tr = { world: w, pts: [], last: -1e9, marks: [], seen: 0 };
+    const S = this._tr;
+    if (w.t - S.last >= 15) {
+      S.pts.push({ t: w.t, v: communityScore(w), s: w.env.stage }); S.last = w.t;
+      if (S.pts.length > 480) S.pts.shift();
+    }
+    if (w.history.length < S.seen) S.seen = 0;
+    for (const e of w.history.slice(S.seen)) if (e.kind === 'you') S.marks.push(e.t);
+    S.seen = w.history.length;
+    const cv = $('trend'); if (!cv || !cv.offsetParent) return;
+    const g = cv.getContext('2d'), W = cv.width, H = cv.height, padT = 6, padB = 4;
+    g.clearRect(0, 0, W, H);
+    if (S.pts.length < 2) { g.fillStyle = '#93a1bd'; g.font = '11px system-ui'; g.fillText('Collecting data…', 8, H / 2 + 4); return; }
+    const t0 = S.pts[0].t, t1 = Math.max(S.pts.at(-1).t, t0 + 90);
+    const X = t => ((t - t0) / (t1 - t0)) * (W - 6) + 3, Y = v => padT + (1 - Math.min(100, Math.max(0, v)) / 100) * (H - padT - padB);
+    g.fillStyle = 'rgba(110,193,255,0.22)'; g.beginPath(); g.moveTo(X(t0), H);
+    for (const p of S.pts) g.lineTo(X(p.t), H - Math.min(1, p.s / 3.2) * (H - padB));
+    g.lineTo(X(S.pts.at(-1).t), H); g.closePath(); g.fill();
+    g.strokeStyle = 'rgba(255,193,77,0.75)'; g.fillStyle = '#ffc14d'; g.lineWidth = 1; g.setLineDash([3, 3]);
+    for (const t of S.marks) { if (t < t0) continue; g.beginPath(); g.moveTo(X(t), padT); g.lineTo(X(t), H); g.stroke(); }
+    g.setLineDash([]);
+    for (const t of S.marks) { if (t >= t0) { g.beginPath(); g.arc(X(t), padT, 2.5, 0, 7); g.fill(); } }
+    g.strokeStyle = '#35e0ff'; g.lineWidth = 2; g.lineJoin = 'round'; g.beginPath();
+    S.pts.forEach((p, i) => (i ? g.lineTo(X(p.t), Y(p.v)) : g.moveTo(X(p.t), Y(p.v)))); g.stroke();
+    const last = S.pts.at(-1); g.fillStyle = '#35e0ff'; g.beginPath(); g.arc(X(last.t), Y(last.v), 3.2, 0, 7); g.fill();
   }
 
   /** Chips: everything running right now — they all run together. */
@@ -139,8 +173,14 @@ export class UI {
   clearSelection() { this.selected = null; $('npc-card').classList.add('hidden'); }
 
   talkHint(npc) {
-    const el = $('talk-hint');
-    if (!npc) { el.classList.add('hidden'); return; }
+    const el = $('talk-hint'), btn = $('btn-talk'), touch = document.body.classList.contains('touch');
+    if (!npc) { el.classList.add('hidden'); btn.classList.add('hidden'); return; }
+    if (touch) {                                       // phones: a real button instead of the E key
+      const label = `💬 Talk to ${npc.name.split(' ')[0]}`;
+      el.classList.add('hidden'); btn.classList.remove('hidden');
+      if (btn.textContent !== label) btn.textContent = label;
+      return;
+    }
     el.classList.remove('hidden'); el.textContent = `E — talk to ${npc.name}`;
   }
 

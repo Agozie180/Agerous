@@ -16,6 +16,7 @@ export class Player {
     this.yaw = Math.PI; this.pitch = 0.42; this.dist = 9;
     this.skyYaw = 0.6; this.skyPitch = 0.95; this.skyDist = 80;
     this.keys = new Set();
+    this.joy = { x: 0, y: 0 };           // on-screen joystick, each axis -1..1 (touch devices)
     this.typing = false;                 // true while the prompt box has focus
     this.group = new THREE.Group();
     const mat = new THREE.MeshLambertMaterial({ color: 0x35e0ff, emissive: 0x0a4a5a });
@@ -64,13 +65,17 @@ export class Player {
       if (k.has('KeyA') || k.has('ArrowLeft')) mx -= 1;
       if (k.has('KeyD') || k.has('ArrowRight')) mx += 1;
     }
+    let push = 1;                                                      // stick deflection scales speed
+    const joyMag = Math.hypot(this.joy.x, this.joy.y);
+    if (this.mode === 'walk' && !this.typing && joyMag > 0.12 && !(mx || mz)) { mx = this.joy.x; mz = this.joy.y; push = Math.min(1, joyMag); }
     const moving = mx || mz;
     if (moving) {
       const l = Math.hypot(mx, mz); mx /= l; mz /= l;
       const sin = Math.sin(this.yaw), cos = Math.cos(this.yaw);
       const wx = mx * cos + mz * sin, wz = -mx * sin + mz * cos;      // camera-relative
       const depth = Math.max(0, world.env.stage - terrainHeight(this.x, this.z));
-      let speed = (k.has('ShiftLeft') || k.has('ShiftRight') ? 11 : 6.2) * (depth > 0.15 ? Math.max(0.3, 1 - depth * 0.5) : 1);
+      const run = k.has('ShiftLeft') || k.has('ShiftRight') || joyMag > 0.92;
+      let speed = (run ? 11 : 6.2) * push * (depth > 0.15 ? Math.max(0.3, 1 - depth * 0.5) : 1);
       let nx = this.x + wx * speed * dt, nz = this.z + wz * speed * dt;
       // buildings are solid
       for (const s of Object.values(LOCATION_SPECS)) {

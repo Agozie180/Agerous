@@ -2,12 +2,15 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0a0e18" />
   <title>AGEROUS — describe what happens, watch the world live through it</title>
   <meta name="description" content="A 3D browser game where you describe events in plain language and a small living town reacts to them for real." />
   <meta property="og:title" content="AGEROUS — describe what happens, watch the world live through it" />
   <meta property="og:description" content="A 3D browser game: type an event in plain language and a living town reacts for real — floods, elections, schools, markets, shelters." />
-  <meta property="og:image" content="docs/social.png" />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="__OG_IMAGE__" />
+  <meta name="twitter:image" content="__OG_IMAGE__" />
   <meta name="twitter:card" content="summary_large_image" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230a0e18'/%3E%3Cpath d='M12 46 L32 14 L52 46 Z' fill='none' stroke='%2335e0ff' stroke-width='6' stroke-linejoin='round'/%3E%3Cpath d='M10 52 q11 -8 22 0 t22 0' fill='none' stroke='%23ffc14d' stroke-width='5'/%3E%3C/svg%3E" />
   <link rel="stylesheet" href="/src/style.css" />
@@ -30,6 +33,7 @@
     </div>
     <div id="tools">
       <button id="btn-view" title="Toggle walk / sky view (Tab)">Sky view</button>
+      <button id="btn-sound" title="Sound on / off" aria-label="Toggle sound">🔊</button>
       <button id="btn-ai" title="AI interpreter settings">AI</button>
       <button id="btn-chal" class="hot" title="Storm Day challenge + leaderboard">🏆 Challenge</button>
       <button id="btn-chat" title="Global chat">💬<i id="chat-dot" class="hidden"></i></button>
@@ -39,7 +43,8 @@
   </header>
 
   <aside id="left">
-    <section class="panel" id="status-panel"><h3>Town</h3><div id="status-rows"></div></section>
+    <section class="panel" id="status-panel"><h3>Town</h3><div id="status-rows"></div>
+      <div id="trend-wrap"><div class="trend-h"><span>Wellbeing over time</span><small><i class="k-you"></i>you <i class="k-flood"></i>river</small></div><canvas id="trend" width="262" height="70" aria-label="Wellbeing over time"></canvas></div></section>
     <section class="panel" id="challenge-panel"><h3>Challenges</h3><div id="challenges"></div></section>
   </aside>
 
@@ -50,6 +55,8 @@
 
   <div id="npc-card" class="panel hidden"></div>
   <div id="talk-hint" class="hidden"></div>
+  <div id="joystick" aria-label="Move"><i></i></div>
+  <button id="btn-talk" class="hidden">💬 Talk</button>
 
   <div id="chal-bar" class="hidden"><b>🏆 STORM DAY</b><span id="chal-left"></span><span id="chal-clock"></span><button id="chal-quit">Exit</button></div>
 

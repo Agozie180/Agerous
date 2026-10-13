@@ -42,3 +42,10 @@ Counts: 46 unit tests pass (incl. 30-day autonomy and concurrent-event fuzz runs
 - The offline parser is vocabulary-based. Unusual phrasing will be rejected rather than guessed.
 - The browser run used SwiftShader (software WebGL). Frame rate on real GPUs is untested here.
 - The bundle is about 540 kB because three.js is included. It could be code-split.
+
+## Update — polish pass (Oct 12)
+
+- Found and fixed: `docs/social.png` was not in the production build, so link previews had no image. It now ships from `public/` with an absolute `og:image` URL (set `SITE_URL`, or Vercel's production URL is used).
+- Found and fixed: the top bar wraps to two rows and covered the first rows of both side panels and the consequence banner on desktop; on phones the *New world* button was clipped, there was no way to walk or talk, and the prompt box was cramped. Layout and touch controls fixed.
+- Added: procedural audio, lightning, wellbeing-over-time graph. Browser e2e is now 28 checks (flows A–H) and passes, as do the 69 unit tests.
+- Still true: live LLM calls are mock-tested only; frame rate was measured on software rendering only.
