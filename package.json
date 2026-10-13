@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "node --test test/*.test.mjs",
-    "e2e": "python3 e2e/run.py http://localhost:4173/"
+    "e2e": "python3 e2e/run.py http://localhost:4173/",
+    "measure": "node scripts/measure.mjs"
   },
   "dependencies": {
     "three": "^0.165.0"

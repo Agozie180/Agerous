@@ -12,6 +12,28 @@
 
 **The one idea:** the AI never touches the world. It only *proposes* events; a validator and a deterministic simulation decide what they mean. That is why it is safe, testable and reproducible.
 
+### The idea, enforced — not asserted
+
+| The AI is allowed to… | …and is structurally prevented from… | Proven by (`npm test`) |
+|---|---|---|
+| propose events from a fixed schema | inventing event types or structures | `AI hallucinations are rejected by the validator, not executed` · `build: schema rejects hallucinated structures/targets…` |
+| answer "unsupported" | being silently replaced by a guess | `AI says unsupported → rejected honestly (no silent fallback to a guess)` |
+| voice a resident in character | changing the world by talking | `talk: offline replies are grounded in state and never change the world` |
+| sit behind your server proxy | leaking the key or being redirected | `proxy: the key stays server-side…` · `server: LLM_BASE_URL selects any gateway from env only; request bodies cannot redirect it` |
+| be wrong or off-topic | corrupting the world | `unsupported requests are rejected with guidance, never faked` · `fuzz: 40 random prompts over 12 days on 8 seeds never break an invariant` |
+| submit a leaderboard run | claiming a score it didn't earn | `replay: same run → same score; different runs → different scores; tampered runs are rejected` |
+
+### Measured
+
+| Claim | Number | Reproduce with |
+|---|---|---|
+| Server verification is cheap and exact | full 4-day Storm Day replay in ~100–280 ms; identical score on every run | `npm run measure` |
+| Unit tests | 69 passing (physics, determinism, replay, interpreter, persistence, chat, proxy) | `npm test` |
+| Browser flows | 28 end-to-end checks incl. a phone viewport | `npm run e2e` |
+| Payload | ~40 kB (app) + ~125 kB (three.js) gzipped | `npm run build` |
+
+Numbers were taken on a software-rendered cloud container, so treat the timings as an upper bound on a normal laptop.
+
 **Try it in 10 seconds:** open the page → press **▶ Watch a flood unfold**. No key, no install, no account.
 
 ## What makes it different from "an AI game"
