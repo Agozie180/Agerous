@@ -52,8 +52,8 @@ With no key at all, an offline rule parser does the interpreting, so the whole g
 | Claim | Number | Reproduce with |
 |---|---|---|
 | Server verification is cheap and exact | full 4-day Storm Day replay in ~100–280 ms; identical score on every run | `npm run measure` |
-| Unit tests | 69 passing (physics, determinism, replay, interpreter, persistence, chat, proxy) | `npm test` |
-| Browser flows | 28 end-to-end checks incl. a phone viewport | `npm run e2e` |
+| Unit tests | 80 passing (physics, determinism, replay, interpreter, persistence, durable store, moderation, chat limits, proxy) | `npm test` |
+| Browser flows | 50+ end-to-end checks incl. a phone viewport and a WebGL-disabled fallback | `npm run e2e` |
 | Payload | ~40 kB (app) + ~125 kB (three.js) gzipped | `npm run build` |
 
 Timings were taken in a software-rendered cloud container, so treat them as an upper bound on a normal laptop.
@@ -150,7 +150,8 @@ The repo deploys as-is: a Vite static build plus serverless functions in `api/` 
 | `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL` | **Any** OpenAI-compatible gateway for the hosted demo. Add `LLM_API_STYLE=anthropic` for an Anthropic-compatible one. |
 | *or* `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` (+ `*_MODEL`) | The official APIs |
 | `KV_REST_API_URL` + `KV_REST_API_TOKEN` | **Durable** leaderboard and chat. The *Upstash for Redis* Marketplace integration sets these (`UPSTASH_REDIS_REST_URL/TOKEN` also work). Without it, scores and chat live in server memory and reset on restart — the UI says so. |
-| `LLM_RATE_PER_MIN`, `LB_RATE_PER_MIN`, `CHAT_RATE_PER_MIN`, `ALLOW_ORIGIN` | Optional limits |
+| `LLM_RATE_PER_MIN`, `LB_RATE_PER_MIN`, `CHAT_RATE_PER_MIN` (default 10), `CHAT_MIN_GAP_SEC` (2), `CHAT_READ_PER_MIN` (90), `ALLOW_ORIGIN` | Optional limits. Chat is rate-limited per IP; links are stripped and profanity masked. |
+| `GET /api/health` | Reports `durable` and whether the store is reachable — check it after deploying. |
 | `CHAT_ADMIN_KEY` | Lets you clear the chat: `POST /api/chat {"action":"clear","key":"…"}` |
 | `CHAT_DISABLED=1` | Turn the chat off |
 | `SITE_URL` | Optional absolute URL for the social-preview image. On Vercel the production URL is picked up automatically. |
@@ -163,7 +164,7 @@ With no LLM variables the game falls back to the offline rules. Locally, run `no
 npm test          # 69 tests: physics, determinism, replay-verified leaderboard, chat, institutions, autonomy, concurrency fuzz, election, interpreter, proxy, schema, persistence
 npm run measure   # replay timing + determinism check for Storm Day
 npm run build     # production bundle in dist/
-npm run e2e       # Playwright flows A–H against `vite preview` (needs Chromium; start `node server/proxy.mjs` first)
+npm run e2e       # Playwright flows A–I against `vite preview` (needs Chromium; start `node server/proxy.mjs` first)
 ```
 
 ```
@@ -187,3 +188,8 @@ test/ · e2e/      node:test suites (no dependencies) · browser end-to-end scri
 ## License
 
 MIT
+
+
+## URL parameters
+
+`?play` skips the intro · `?demo` runs the flood demo · `?challenge` opens Storm Day (`?challenge=start` begins it). Without WebGL the game shows a fallback screen with a demo GIF and hardware-acceleration tips; uncaught errors show a toast. Test the durable path locally with `node scripts/fake-upstash.mjs`.

@@ -69,6 +69,9 @@ export class UI {
     if (w.history.length < S.seen) S.seen = 0;
     for (const e of w.history.slice(S.seen)) if (e.kind === 'you') S.marks.push(e.t);
     S.seen = w.history.length;
+    // the key only names what is actually drawn: nothing on a brand-new world
+    $('k-you').classList.toggle('hidden', !S.marks.length);
+    $('k-river').classList.toggle('hidden', !S.pts.some(p => p.s > 0.05));
     const cv = $('trend'); if (!cv || !cv.offsetParent) return;
     const g = cv.getContext('2d'), W = cv.width, H = cv.height, padT = 6, padB = 4;
     g.clearRect(0, 0, W, H);

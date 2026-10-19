@@ -7,6 +7,8 @@
  */
 import { buildSystemPrompt } from '../src/simulation/interpreter.js';
 import { chatComplete } from '../src/simulation/llm.js';
+import { createStore } from './store.mjs';
+import { moderate, isCleanName } from './moderation.mjs';
 
 // Best-effort abuse guard (per server instance). Set LLM_RATE_PER_MIN to tune.
 const hits = new Map();
@@ -16,6 +18,18 @@ export function rateLimited(ip, env) {
   arr.push(now); hits.set(ip, arr);
   if (hits.size > 5000) hits.clear();
   return arr.length > limit;
+}
+
+/**
+ * Rate limit that is shared across serverless instances when a durable store is configured
+ * (a fixed window counter in Redis); otherwise it falls back to the per-instance limiter above.
+ * Fails open: if the store is briefly unreachable we never block a legitimate player.
+ */
+export async function rateLimitedShared(key, limit, { windowSec = 60, store } = {}) {
+  try {
+    if (store?.durable) return (await store.hit(`rl:${key}:${Math.floor(Date.now() / (windowSec * 1000))}`, windowSec + 1)) > limit;
+  } catch { /* store hiccup → fall through to the local limiter */ }
+  return rateLimited(key, { LLM_RATE_PER_MIN: limit });
 }
 
 /**
@@ -58,43 +72,45 @@ export async function handleNpc(body, env, fetch = globalThis.fetch) {
   return { status: 200, json: { reply: clean(reply, 280).trim(), model } };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Leaderboard (scores are VERIFIED by replaying the run on the server) and global chat.
-// ─────────────────────────────────────────────────────────────────────────────
+// ───────────────────────────────────────────────────────────────────────────
+// Leaderboard (scores are VERIFIED by replaying the run on the server), global chat, health.
+// ───────────────────────────────────────────────────────────────────────────
 import { replayRun, SCENARIO } from '../src/simulation/scenario.js';
-import { createStore } from './store.mjs';
 
 const cleanName = v => String(v ?? '').replace(/[^\p{L}\p{N} _.\-]/gu, '').replace(/\s+/g, ' ').trim().slice(0, 20);
-const LB_KEY = `lb:${SCENARIO.id}`;
+const LB_KEY = `lbh:${SCENARIO.id}`;            // hash: one field per player (lower-cased name) → race-safe
+const LB_MAX = 300;
 const better = (a, b) => a.total > b.total || (a.total === b.total && a.used < b.used);
+const rank = all => all.sort((a, b) => b.total - a.total || a.used - b.used || a.ts - b.ts);
 
 export async function handleLeaderboard({ method, body, ip }, env, store = createStore(env)) {
   if (method === 'GET') {
-    const all = (await store.get(LB_KEY)) || [];
+    const all = rank(Object.values(await store.hall(LB_KEY)).filter(Boolean));
     return { status: 200, json: { scenario: SCENARIO.id, durable: store.durable, entries: all.slice(0, 50) } };
   }
   if (method !== 'POST') return { status: 405, json: { error: 'GET or POST' } };
-  if (rateLimited(`lb:${ip}`, { LLM_RATE_PER_MIN: env.LB_RATE_PER_MIN || 6 })) return { status: 429, json: { error: 'slow down' } };
+  if (await rateLimitedShared(`lb:${ip}`, Number(env.LB_RATE_PER_MIN) || 6, { store })) return { status: 429, json: { error: 'slow down' } };
   const name = cleanName(body?.name);
   if (!name) return { status: 400, json: { error: 'Pick a name (letters/numbers, up to 20).' } };
+  if (!isCleanName(name)) return { status: 400, json: { error: 'Please pick a different name.' } };
   const res = replayRun(body?.run);                       // the server decides the score — the client's claim is ignored
   if (!res.ok) return { status: 400, json: { error: `Run rejected: ${res.error}` } };
   const entry = { name, total: res.score.total, parts: res.score.parts, used: res.used, turnout: res.score.turnout, ts: Date.now() };
-  const all = (await store.get(LB_KEY)) || [];
-  const i = all.findIndex(e => e.name.toLowerCase() === name.toLowerCase());
-  if (i >= 0) { if (better(entry, all[i])) all[i] = entry; } else all.push(entry);
-  all.sort((a, b) => b.total - a.total || a.used - b.used || a.ts - b.ts);
-  await store.set(LB_KEY, all.slice(0, 200));
-  const rank = all.findIndex(e => e.name.toLowerCase() === name.toLowerCase()) + 1;
-  return { status: 200, json: { score: res.score, rank, of: all.length, durable: store.durable } };
+  const field = name.toLowerCase(), prev = await store.hget(LB_KEY, field);
+  if (!prev || better(entry, prev)) await store.hset(LB_KEY, field, entry);
+  let all = rank(Object.values(await store.hall(LB_KEY)).filter(Boolean));
+  if (all.length > LB_MAX) { for (const e of all.slice(LB_MAX)) await store.hdel(LB_KEY, e.name.toLowerCase()); all = all.slice(0, LB_MAX); }
+  const place = all.findIndex(e => e.name.toLowerCase() === field) + 1;
+  return { status: 200, json: { score: res.score, rank: place, of: all.length, durable: store.durable } };
 }
 
-const BAD = /\b(fuck\w*|shit\w*|bitch\w*|cunt|nigg\w*|faggot|rape\w*|kill yourself)\b/gi;
 const CHAT_KEY = 'chat:global';
+const fnv = str => { let h = 2166136261; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(36); };
 
 export async function handleChat({ method, body, query, ip }, env, store = createStore(env)) {
   if (env.CHAT_DISABLED) return { status: 503, json: { error: 'Chat is turned off.' } };
   if (method === 'GET') {
+    if (await rateLimitedShared(`chatread:${ip}`, Number(env.CHAT_READ_PER_MIN) || 90, { store })) return { status: 429, json: { error: 'Slow down — too many chat refreshes.' } };
     const msgs = await store.list(CHAT_KEY, 60);
     const after = Number(query?.after) || 0;
     return { status: 200, json: { durable: store.durable, messages: msgs.filter(m => m.id > after).reverse() } };
@@ -104,13 +120,29 @@ export async function handleChat({ method, body, query, ip }, env, store = creat
     if (!env.CHAT_ADMIN_KEY || body.key !== env.CHAT_ADMIN_KEY) return { status: 403, json: { error: 'no' } };
     await store.del(CHAT_KEY); return { status: 200, json: { ok: true } };
   }
-  const name = cleanName(body?.name) || 'visitor';
-  let text = String(body?.text ?? '').replace(/[<>\u0000-\u001f]/g, ' ').replace(/https?:\/\/\S+|www\.\S+/gi, '[link removed]').replace(/\s+/g, ' ').trim().slice(0, 200);
-  if (!text) return { status: 400, json: { error: 'Say something.' } };
-  if (rateLimited(`chat:${ip}`, { LLM_RATE_PER_MIN: env.CHAT_RATE_PER_MIN || 20 })) return { status: 429, json: { error: 'You are sending messages too fast.' } };
-  text = text.replace(BAD, '•••');
+  const nameRaw = cleanName(body?.name), name = nameRaw && isCleanName(nameRaw) ? nameRaw : 'visitor';
+  const mod = moderate(body?.text, 200);
+  if (!String(body?.text ?? '').trim()) return { status: 400, json: { error: 'Say something.' } };
+  if (mod.empty) return { status: 400, json: { error: mod.links ? 'Links are not allowed in chat.' : 'That message is not allowed.' } };
+  // Per IP: a sustained limit (default 10 / minute) AND a short gap (default 2 s) so a script cannot burst.
+  if (await rateLimitedShared(`chat:${ip}`, Number(env.CHAT_RATE_PER_MIN) || 10, { store })) return { status: 429, json: { error: 'You are sending messages too fast. Wait a moment.' } };
+  const gap = env.CHAT_MIN_GAP_SEC === undefined ? 2 : Number(env.CHAT_MIN_GAP_SEC);
+  if (gap > 0) { try { if (await store.hit(`chatgap:${ip}`, gap) > 1) return { status: 429, json: { error: 'Easy — one message every couple of seconds.' } }; } catch { /* fail open */ } }
+  try { if (await store.hit(`chatdup:${ip}:${fnv(mod.text.toLowerCase())}`, 30) > 1) return { status: 429, json: { error: 'You already said that.' } }; } catch { /* fail open */ }
   const last = (await store.list(CHAT_KEY, 1))[0];
-  const msg = { id: Math.max(Date.now(), (last?.id || 0) + 1), name, text };
+  const msg = { id: Math.max(Date.now(), (last?.id || 0) + 1), name, text: mod.text };
   await store.push(CHAT_KEY, msg, 100);
-  return { status: 200, json: { ok: true, message: msg } };
+  return { status: 200, json: { ok: true, message: msg, ...(mod.links || mod.profanity ? { filtered: true } : {}) } };
+}
+
+/** GET /api/health — lets you confirm a deploy is wired up (storage really durable, LLM configured). */
+export async function handleHealth(env, store = createStore(env)) {
+  const out = { ok: true, store: { durable: store.durable, reachable: false }, llm: { configured: false }, scenario: SCENARIO.id };
+  try { serverLLM(env); out.llm.configured = true; } catch { /* not configured */ }
+  try {
+    const probe = `health:${Date.now()}`;
+    await store.set(probe, { ok: 1 }); out.store.reachable = (await store.get(probe))?.ok === 1; await store.del(probe);
+  } catch (e) { out.store.error = String(e.message || e).slice(0, 120); out.ok = false; }
+  if (!store.durable) out.store.note = 'No KV/Upstash env vars found: leaderboard and chat live in server memory and reset on restart.';
+  return { status: 200, json: out };
 }

@@ -16,6 +16,33 @@
   <link rel="stylesheet" href="/src/style.css" />
 </head>
 <body>
+  <div id="toasts" aria-live="assertive"></div>
+  <script>
+    // Visible error toasts. Runs before the game script so that even a failed module load is reported.
+    (function () {
+      var box = document.getElementById('toasts'), seen = {};
+      function toast(msg, kind) {
+        msg = String(msg || 'Unknown error').replace(/^Uncaught (\w*Error: )?/, '').slice(0, 220);
+        if (/ResizeObserver loop/.test(msg)) return;
+        var now = Date.now(); if (seen[msg] && now - seen[msg] < 8000) return; seen[msg] = now;
+        while (box.children.length >= 3) box.removeChild(box.firstChild);
+        var el = document.createElement('div'); el.className = 'toast ' + (kind || 'error'); el.setAttribute('role', 'alert');
+        var b = document.createElement('b'); b.textContent = kind === 'info' ? 'Heads up' : 'Something went wrong';
+        var t = document.createElement('span'); t.textContent = msg;
+        var x = document.createElement('button'); x.type = 'button'; x.textContent = '\u00d7'; x.setAttribute('aria-label', 'Dismiss');
+        el.appendChild(b); el.appendChild(t); el.appendChild(x); box.appendChild(el);
+        var gone = function () { if (el.parentNode) el.parentNode.removeChild(el); };
+        x.onclick = gone; setTimeout(gone, 10000);
+      }
+      window.agerousToast = toast;
+      window.onerror = function (message, src, line) { toast(message === 'Script error.' ? 'A script failed to run.' : message); return false; };
+      window.addEventListener('unhandledrejection', function (e) { var r = e.reason; toast((r && r.message) || r || 'A background task failed.'); });
+      window.addEventListener('error', function (e) {          // failed <script>/<link> loads do not reach window.onerror
+        var t = e.target; if (t && (t.tagName === 'SCRIPT' || t.tagName === 'LINK')) toast('Could not load ' + (t.src || t.href || 'a game file').split('/').pop() + '. Check your connection and reload.');
+      }, true);
+      setTimeout(function () { if (!window.__agerousBooted) toast('The game is taking a long time to start. Check your connection, then reload.', 'info'); }, 15000);
+    })();
+  </script>
   <canvas id="world-canvas"></canvas>
 
   <header id="hud-top">
@@ -35,6 +62,7 @@
       <button id="btn-view" title="Toggle walk / sky view (Tab)">Sky view</button>
       <button id="btn-sound" title="Sound on / off" aria-label="Toggle sound">🔊</button>
       <button id="btn-ai" title="AI interpreter settings">AI</button>
+      <span id="ai-chip" class="ai-chip" role="status" title="Whether an AI key is set">Offline rules</span>
       <button id="btn-chal" class="hot" title="Storm Day challenge + leaderboard">🏆 Challenge</button>
       <button id="btn-chat" title="Global chat">💬<i id="chat-dot" class="hidden"></i></button>
       <button id="btn-help" title="What is this?">?</button>
@@ -44,7 +72,7 @@
 
   <aside id="left">
     <section class="panel" id="status-panel"><h3>Town</h3><div id="status-rows"></div>
-      <div id="trend-wrap"><div class="trend-h"><span>Wellbeing over time</span><small><i class="k-you"></i>you <i class="k-flood"></i>river</small></div><canvas id="trend" width="262" height="70" aria-label="Wellbeing over time"></canvas></div></section>
+      <div id="trend-wrap"><div class="trend-h"><span>Wellbeing over time</span><small id="trend-key"><span id="k-you" class="hidden"><i class="k-you"></i>your sentences</span><span id="k-river" class="hidden"><i class="k-flood"></i>river</span></small></div><canvas id="trend" width="262" height="70" aria-label="Wellbeing over time"></canvas></div></section>
     <section class="panel" id="challenge-panel"><h3>Challenges</h3><div id="challenges"></div></section>
   </aside>
 
@@ -79,13 +107,31 @@
   <div id="chain" class="hidden" aria-live="polite"></div>
   <div id="caption" class="hidden"></div>
 
+  <div id="nogl" class="hidden" role="alertdialog" aria-labelledby="nogl-title">
+    <div id="nogl-box">
+      <div class="logo">AGEROUS</div>
+      <h1 id="nogl-title">3D isn't available in this browser</h1>
+      <p>Agerous draws its town with WebGL, and this browser couldn't start it. This is what the game looks like:</p>
+      <img id="nogl-demo" alt="Short demo: one typed sentence makes a flood rise, close the school and send residents to a shelter" width="640" height="360" data-src="demo.gif" />
+      <div class="tip"><b>Tip: turn on hardware acceleration</b>
+        <ul>
+          <li><b>Chrome / Edge:</b> Settings → System → “Use graphics acceleration when available”, then restart the browser.</li>
+          <li><b>Firefox:</b> Settings → General → Performance → untick “Use recommended performance settings”, then tick “Use hardware acceleration when available”.</li>
+          <li><b>Safari / iPhone:</b> update to the latest version and turn off Low Power Mode.</li>
+        </ul>
+      </div>
+      <div class="cta"><button id="nogl-retry">Try again</button><a class="btn ghost" href="https://github.com/Agozie180/Agerous#readme" target="_blank" rel="noopener">How it works</a></div>
+      <small id="nogl-why"></small>
+    </div>
+  </div>
+
   <div id="intro">
     <div id="intro-box">
       <div class="logo">AGEROUS</div>
       <h1>Type what happens.<br/><span>A living 3D town reacts — for real.</span></h1>
       <div class="steps">
         <div><b>1</b><i>✍</i><span>You describe an event<br/><em>“A severe flood is coming”</em></span></div>
-        <div><b>2</b><i>🧠</i><span>AI turns it into a<br/>validated event</span></div>
+        <div><b>2</b><i>🧠</i><span>Built-in rules (or your AI key) turn it into a validated event</span></div>
         <div><b>3</b><i>🌍</i><span>The simulation runs it:<br/>water, roads, people, rules</span></div>
       </div>
       <p>School, market, church and homes run on their own every day. Your sentence changes the world they live in — and the town remembers.</p>

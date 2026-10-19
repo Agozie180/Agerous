@@ -92,7 +92,7 @@ test('chat: post, read in order, sanitise, mask abuse, strip links, rate limit, 
 
 test('chat flood: 30 rapid messages from one IP are throttled', async () => {
   const store = createStore({}); const out = [];
-  for (let i = 0; i < 30; i++) out.push((await handleChat({ method: 'POST', body: { name: 'a', text: 'm' + i }, ip: '9.9.9.9' }, { CHAT_RATE_PER_MIN: '10' }, store)).status);
+  for (let i = 0; i < 30; i++) out.push((await handleChat({ method: 'POST', body: { name: 'a', text: 'm' + i }, ip: '9.9.9.9' }, { CHAT_RATE_PER_MIN: '10', CHAT_MIN_GAP_SEC: '0' }, store)).status);
   assert.equal(out.filter(s => s === 200).length, 10);
 });
 
