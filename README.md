@@ -9,7 +9,7 @@
 
 Say *"A severe flood is coming and the election is tomorrow"* and the river rises over real terrain, roads go under, the school closes, civil defence opens a shelter, and 25 residents decide for themselves whether to flee, vote or go to work — all at once, all from one sentence.
 
-**Links:** [Submission pack](SUBMISSION.md) · [Audit: what was fake, what is verified](AUDIT.md) · [Run it locally](#try-it-in-30-seconds) · [Deploy](#deploy-vercel)
+**Links:** [Play the live demo](https://agerous.vercel.app) · [Watch the 2:27 demo video](https://youtu.be/4dBixYf3o4s) · [Submission pack](SUBMISSION.md) · [Audit: what was fake, what is verified](AUDIT.md) · [Run it locally](#try-it-in-30-seconds) · [Deploy](#deploy-vercel)
 
 | ✍ You type | 🧠 AI proposes | ✅ Schema validates | 🌍 Simulation decides | 🎥 3D renders |
 |---|---|---|---|---|
@@ -151,7 +151,7 @@ The repo deploys as-is: a Vite static build plus serverless functions in `api/` 
 | *or* `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` (+ `*_MODEL`) | The official APIs |
 | `KV_REST_API_URL` + `KV_REST_API_TOKEN` | **Durable** leaderboard and chat. The *Upstash for Redis* Marketplace integration sets these (`UPSTASH_REDIS_REST_URL/TOKEN` also work). Without it, scores and chat live in server memory and reset on restart — the UI says so. |
 | `LLM_RATE_PER_MIN`, `LB_RATE_PER_MIN`, `CHAT_RATE_PER_MIN` (default 10), `CHAT_MIN_GAP_SEC` (2), `CHAT_READ_PER_MIN` (90), `ALLOW_ORIGIN` | Optional limits. Chat is rate-limited per IP; links are stripped and profanity masked. |
-| `GET /api/health` | Reports `durable` and whether the store is reachable — check it after deploying. |
+| `GET /api/health` | Reports whether an LLM is configured plus store durability/reachability — check it after deploying. |
 | `CHAT_ADMIN_KEY` | Lets you clear the chat: `POST /api/chat {"action":"clear","key":"…"}` |
 | `CHAT_DISABLED=1` | Turn the chat off |
 | `SITE_URL` | Optional absolute URL for the social-preview image. On Vercel the production URL is picked up automatically. |
@@ -161,7 +161,7 @@ With no LLM variables the game falls back to the offline rules. Locally, run `no
 ## Development
 
 ```bash
-npm test          # 69 tests: physics, determinism, replay-verified leaderboard, chat, institutions, autonomy, concurrency fuzz, election, interpreter, proxy, schema, persistence
+npm test          # 80 tests: physics, determinism, replay-verified leaderboard, chat, institutions, autonomy, concurrency fuzz, election, interpreter, proxy, schema, persistence
 npm run measure   # replay timing + determinism check for Storm Day
 npm run build     # production bundle in dist/
 npm run e2e       # Playwright flows A–I against `vite preview` (needs Chromium; start `node server/proxy.mjs` first)
@@ -180,7 +180,7 @@ test/ · e2e/      node:test suites (no dependencies) · browser end-to-end scri
 
 - The simulation is deliberately small: one valley, 25 residents. Residents follow **rules, not autonomous AI agents**; the model gives them a voice, not their decisions.
 - The offline parser understands a fixed vocabulary and rejects unusual phrasing rather than guessing.
-- The live OpenAI/Anthropic paths are covered by mocked tests; live providers need your key.
+- The official OpenAI/Anthropic paths are covered by mocked tests. The hosted demo's OpenAI-compatible AnyModel gateway has also been verified live; self-hosted deployments need their own provider key.
 - A public hosted demo exposes an LLM key and an open chat: both need a spend cap and real moderation (built in: rate limits, link stripping and a basic profanity filter — not a substitute for moderating a public chat).
 - The visuals are low-poly by design. Frame rate has only been measured on software rendering. The bundle is ~600 kB raw, split so three.js loads separately.
 - [AUDIT.md](AUDIT.md) lists what the original repo claimed, what was fake, and what is now verified.

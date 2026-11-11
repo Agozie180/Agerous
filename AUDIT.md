@@ -33,11 +33,11 @@ Done on the original commit (`ffee5b0`), then repeated after the rebuild.
 | Persistence | Save → load → run on gives an identical future (unit test). Browser flow D reloads the page and gets back the clock, flood level and history through the real autosave. |
 | Real 3D native browser game | `npm run e2e`: walkable avatar, sky view, inspector, minimap, the prompt box, no console errors. |
 
-Counts: 46 unit tests pass (incl. 30-day autonomy and concurrent-event fuzz runs), browser flows A–D pass.
+Counts: 80 unit tests pass (including 30-day autonomy and concurrent-event fuzz runs), with 50+ browser checks covering desktop, phone, WebGL fallback and gameplay flows.
 
 ## Known gaps (not hidden)
 
-- The live OpenAI and Anthropic calls were tested only against mocked responses, since no key was available.
+- The official OpenAI and Anthropic adapters are covered by mocked responses. The production server proxy has also been live-verified through an OpenAI-compatible AnyModel gateway.
 - NPC behaviour is a deterministic priority list. The *reasons* come from state, but the agents are not autonomous.
 - The offline parser is vocabulary-based. Unusual phrasing will be rejected rather than guessed.
 - The browser run used SwiftShader (software WebGL). Frame rate on real GPUs is untested here.
@@ -47,5 +47,10 @@ Counts: 46 unit tests pass (incl. 30-day autonomy and concurrent-event fuzz runs
 
 - Found and fixed: `docs/social.png` was not in the production build, so link previews had no image. It now ships from `public/` with an absolute `og:image` URL (set `SITE_URL`, or Vercel's production URL is used).
 - Found and fixed: the top bar wraps to two rows and covered the first rows of both side panels and the consequence banner on desktop; on phones the *New world* button was clipped, there was no way to walk or talk, and the prompt box was cramped. Layout and touch controls fixed.
-- Added: procedural audio, lightning, wellbeing-over-time graph. Browser e2e is now 28 checks (flows A–H) and passes, as do the 69 unit tests.
-- Still true: live LLM calls are mock-tested only; frame rate was measured on software rendering only.
+- Added: procedural audio, lightning, wellbeing-over-time graph. Browser e2e now has 50+ checks and passes, as do all 80 unit tests.
+
+## Production verification (Nov 11)
+
+- The hosted Vercel demo reports its LLM configured and returned a valid live event through an OpenAI-compatible AnyModel gateway.
+- The submitted demo video is live on YouTube and runs 2:27.
+- Frame rate was still measured on software rendering only.

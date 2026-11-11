@@ -2,6 +2,8 @@
 
 **Focus category:** Prompt-to-world creation / AI-generated gameplay
 
+**Submitted project:** [Live demo](https://agerous.vercel.app) · [Demo video (2:27)](https://youtu.be/4dBixYf3o4s) · [Public repository](https://github.com/Agozie180/Agerous)
+
 ## Short description (paste into the form)
 
 **What we built.** Agerous is a browser-native 3D game built on three.js. You play it by typing events in plain language — "A severe flood is coming and the election is tomorrow" — and a small living town reacts: the river rises over real terrain, roads go under, the school closes, civil defence opens a shelter, and 25 residents decide for themselves whether to flee, vote or go to work. School, market, church and homes keep running on their own, all at the same time, and the town remembers across reloads.
@@ -16,17 +18,17 @@
 
 **Feels alive.** Procedural storm audio (rain, wind, river, thunder timed to lightning, church bell, alert tones), a wellbeing-over-time graph that marks each sentence you typed, and touch controls so it plays on a phone.
 
-**Why it holds up.** 69 automated tests (physics, 30-day autonomy, concurrent-event fuzz, interpreter, persistence), 28 Playwright end-to-end checks (including a phone viewport), and an honest [AUDIT.md](AUDIT.md).
+**Why it holds up.** 80 automated tests (physics, 30-day autonomy, concurrent-event fuzz, interpreter, persistence), 50+ Playwright end-to-end checks (including a phone viewport), and an honest [AUDIT.md](AUDIT.md).
 
 ## Deliverables checklist
 
 - [x] Public repository — https://github.com/Agozie180/Agerous
-- [ ] Hosted browser demo — import the repo into Vercel; set `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL` (or `OPENAI_API_KEY`) and add the Upstash Redis integration so the leaderboard and chat are durable; deploy. Judges then get real LLM interpretation with no key.
-- [ ] Demo video, under 3 minutes — script below
+- [x] Hosted browser demo — https://agerous.vercel.app (server-side AnyModel interpretation is enabled; leaderboard and chat currently use server memory until durable Redis storage is attached)
+- [x] Demo video, 2:27 — https://youtu.be/4dBixYf3o4s
 - [x] Written description — above
 - [x] Focus category — above
 
-## Demo video script (≈2:30)
+## Recorded demo outline (2:27)
 
 1. **0:00** Land on the page: "Type what happens. A living 3D town reacts." Press **Watch a flood unfold**.
 2. **0:20** Show the live flood: river rising, roads going under, the chip strip (school closed, shelter open, campaign running together).
@@ -35,7 +37,7 @@
 5. **1:45** Open 🏆 Challenge: play Storm Day with one sentence ("send in the clean-up crews"), fast-forward, show the server-verified rank and the leaderboard, post a line in chat.
 6. **2:05** Type nonsense ("summon a dragon") → rejected, world unchanged. Say why that matters.
 6b. **2:10** Point at the *Wellbeing over time* graph: each amber marker is a sentence you typed, the blue area is the river. Turn the sound on (🔊) before recording to get the thunder.
-7. **2:15** Reload → the town remembers. Show `npm test` (69 passing).
+7. **2:15** Reload → the town remembers. Show `npm test` (80 passing).
 8. **2:25** Close: AI proposes, validator checks, simulation decides.
 
 ## Honest limits (say them, judges respect it)
